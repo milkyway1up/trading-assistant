@@ -36,9 +36,9 @@ def create_app() -> FastAPI:
     async def dashboard(request: Request):
         cfg = get_config()
         return templates.TemplateResponse(
+            request,
             "dashboard.html",
             {
-                "request": request,
                 "watchlist": cfg.watchlist or ["SPY", "AAPL", "NVDA", "TSLA"],
                 "default_ticker": (cfg.watchlist or ["SPY"])[0],
             },
