@@ -47,7 +47,7 @@ async def get_settings() -> dict[str, Any]:
 
 
 @router.post("/secrets")
-async def update_secrets(body: SecretsUpdate) -> dict[str, str]:
+async def update_secrets(body: SecretsUpdate) -> dict[str, Any]:
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if not updates:
         return {"status": "noop"}

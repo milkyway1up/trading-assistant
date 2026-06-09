@@ -17,14 +17,6 @@ TEMPLATES_DIR = WEB_DIR / "templates"
 
 
 def create_app() -> FastAPI:
-    # Make outbound HTTPS work behind a corporate TLS proxy (e.g. Zscaler).
-    # No-op on non-macOS; idempotent if the bundle already exists.
-    try:
-        from trader.utils.ssl_setup import ensure_system_ca_bundle
-        ensure_system_ca_bundle()
-    except Exception:
-        pass
-
     app = FastAPI(
         title="Trading Assistant",
         description="Local dashboard for swing-trading.",

@@ -61,8 +61,11 @@ def ensure_system_ca_bundle() -> Path | None:
             logger.warning(f"Could not export system CA bundle: {e}")
             return None
 
-    # Don't clobber if user has set their own.
-    os.environ.setdefault("CURL_CA_BUNDLE", str(_BUNDLE_PATH))
-    os.environ.setdefault("SSL_CERT_FILE", str(_BUNDLE_PATH))
-    os.environ.setdefault("REQUESTS_CA_BUNDLE", str(_BUNDLE_PATH))
+    # Override unconditionally — curl-cffi needs CURL_CA_BUNDLE pointed at our
+    # bundle, and a stale value (or one inherited from a different shell) will
+    # silently break TLS.
+    bundle = str(_BUNDLE_PATH)
+    os.environ["CURL_CA_BUNDLE"] = bundle
+    os.environ["SSL_CERT_FILE"] = bundle
+    os.environ["REQUESTS_CA_BUNDLE"] = bundle
     return _BUNDLE_PATH
