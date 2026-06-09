@@ -18,7 +18,23 @@ def get_client() -> Anthropic:
         raise RuntimeError(
             "ANTHROPIC_API_KEY not set. Copy env.example to .env and fill in your key."
         )
-    return Anthropic(api_key=secrets.anthropic_api_key)
+    return Anthropic(api_key=secrets.anthropic_api_key, http_client=_build_http_client())
+
+
+def _build_http_client():
+    """httpx Client that validates TLS against the OS-native trust store
+    (macOS keychain), so corporate TLS interception like Zscaler works
+    without us having to curate a PEM bundle and dodge cert-format issues
+    that Python 3.13's stricter validator rejects."""
+    import httpx
+    try:
+        import ssl
+        import truststore
+        ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        return httpx.Client(verify=ctx, timeout=60.0)
+    except Exception as e:
+        logger.warning(f"truststore unavailable, falling back to certifi: {e}")
+        return httpx.Client(timeout=60.0)
 
 
 def call_claude(
