@@ -5,6 +5,9 @@
 .schwab_tokens.json
 *tokens*.json
 
+# User-specific config (template lives in config.example.yaml)
+config.yaml
+
 # Virtual envs
 .venv/
 venv/

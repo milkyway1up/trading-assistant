@@ -116,3 +116,48 @@ def prep_dir() -> Path:
     p = PROJECT_ROOT / "prep"
     p.mkdir(exist_ok=True)
     return p
+
+
+# ─────────────────────────────────────────────────────────────────
+# Mutators (used by the in-app Settings panel)
+# ─────────────────────────────────────────────────────────────────
+
+CONFIG_PATH = PROJECT_ROOT / "config.yaml"
+ENV_PATH = PROJECT_ROOT / ".env"
+_ENV_KEYS = {
+    "anthropic_api_key", "schwab_app_key", "schwab_app_secret",
+    "schwab_callback_url", "slack_webhook_url",
+}
+
+
+def invalidate_caches() -> None:
+    get_secrets.cache_clear()
+    get_config.cache_clear()
+
+
+def save_secrets(updates: dict[str, str]) -> None:
+    """Write the given secret keys into .env, preserving everything else.
+    Empty-string values are written as empty (use to clear a key)."""
+    from dotenv import set_key
+
+    if not ENV_PATH.exists():
+        ENV_PATH.touch(mode=0o600)
+    ENV_PATH.chmod(0o600)
+    for k, v in updates.items():
+        key = k.lower()
+        if key not in _ENV_KEYS:
+            raise ValueError(f"Unknown secret key: {k}")
+        set_key(str(ENV_PATH), key.upper(), v or "", quote_mode="never")
+    invalidate_caches()
+
+
+def save_config(updates: dict[str, Any]) -> AppConfig:
+    """Merge `updates` into config.yaml and re-validate. Returns the new AppConfig.
+    Loses comments — but config.example.yaml stays as the documented template."""
+    current = _load_yaml(CONFIG_PATH)
+    merged = {**current, **updates}
+    validated = AppConfig(**merged)  # raises on bad input
+    with CONFIG_PATH.open("w") as f:
+        yaml.safe_dump(validated.model_dump(), f, sort_keys=False)
+    invalidate_caches()
+    return validated
