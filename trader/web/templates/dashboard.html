@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="h-screen flex flex-col">
+  <!-- Top bar -->
+  <header class="border-b border-slate-800 px-4 py-2 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <h1 class="text-lg font-bold text-cyan-400">Trading Assistant</h1>
+      <span id="ws-status" class="text-xs text-slate-500">connecting…</span>
+    </div>
+    <div class="flex items-center gap-2 text-sm">
+      <div class="flex gap-1" id="timeframe-buttons">
+        {% for tf in ["15m", "1h", "4h", "1d"] %}
+          <button
+            data-tf="{{ tf }}"
+            class="tf-btn px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 {% if tf == '1d' %}bg-slate-800 border-cyan-500{% endif %}"
+          >{{ tf }}</button>
+        {% endfor %}
+      </div>
+      <span id="active-ticker" class="ml-4 font-bold text-lg">{{ default_ticker }}</span>
+      <span id="active-quote" class="text-slate-400 text-sm">—</span>
+    </div>
+  </header>
+
+  <!-- Main 3-col layout -->
+  <div class="flex-1 flex overflow-hidden">
+    <!-- Watchlist -->
+    <aside class="w-48 border-r border-slate-800 overflow-y-auto">
+      <div class="px-3 py-2 text-xs uppercase text-slate-500 border-b border-slate-800">Watchlist</div>
+      <ul id="watchlist">
+        {% for ticker in watchlist %}
+          <li
+            class="watch-item px-3 py-2 cursor-pointer hover:bg-slate-800 border-b border-slate-800/50 flex justify-between items-center {% if ticker == default_ticker %}bg-slate-800{% endif %}"
+            data-ticker="{{ ticker }}"
+          >
+            <span class="font-bold">{{ ticker }}</span>
+            <span class="text-xs text-slate-400" data-ticker-price="{{ ticker }}">—</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </aside>
+
+    <!-- Chart -->
+    <main class="flex-1 flex flex-col">
+      <div id="chart" class="flex-1"></div>
+      <div id="rsi-chart" class="h-32 border-t border-slate-800"></div>
+    </main>
+
+    <!-- Right rail -->
+    <aside class="w-72 border-l border-slate-800 flex flex-col overflow-hidden">
+      <div class="px-3 py-2 border-b border-slate-800">
+        <div class="text-xs uppercase text-slate-500 mb-1">Account</div>
+        <div class="text-sm space-y-0.5">
+          <div class="flex justify-between">
+            <span class="text-slate-400">Settled cash</span>
+            <span id="settled-cash">—</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">Unsettled</span>
+            <span id="unsettled-cash">—</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">Today P&amp;L</span>
+            <span id="day-pnl">—</span>
+          </div>
+        </div>
+        <div class="text-xs text-amber-400 mt-2" id="schwab-banner">
+          Schwab not connected — using yfinance + mock data.
+          Run <code class="bg-slate-800 px-1 rounded">trader auth login</code> after API approval.
+        </div>
+      </div>
+
+      <div class="px-3 py-2 border-b border-slate-800 flex-1 overflow-y-auto">
+        <div class="text-xs uppercase text-slate-500 mb-1">Alerts</div>
+        <ul id="alerts-feed" class="text-xs space-y-1"></ul>
+      </div>
+
+      <div class="px-3 py-2 border-t border-slate-800">
+        <button class="w-full bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded text-sm font-bold">
+          Place order (Phase 3)
+        </button>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/chart.js"></script>
+<script src="/static/js/ws.js"></script>
+<script>
+  initDashboard({
+    defaultTicker: {{ default_ticker | tojson }},
+    watchlist: {{ watchlist | tojson }},
+  });
+</script>
+{% endblock %}

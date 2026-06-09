@@ -1,0 +1,69 @@
+# Copy to config.yaml (cp config.example.yaml config.yaml) and edit.
+
+watchlist:
+  # Liquid large caps — start small, expand once you have signal data
+  - SPY
+  - QQQ
+  - AAPL
+  - MSFT
+  - NVDA
+  - AMD
+  - TSLA
+  - GOOGL
+  - META
+  - AMZN
+
+risk:
+  # Maximum % of account equity at risk per single trade (entry to stop)
+  max_risk_per_trade_pct: 2.0
+  # Maximum % of equity in any one position
+  max_position_pct: 25.0
+  # Maximum stop distance from entry (wider = lower-quality setup)
+  max_stop_distance_pct: 8.0
+  # Default risk % when sizing helper is invoked without explicit value
+  default_risk_pct: 1.0
+
+llm:
+  model: claude-sonnet-4-6
+  # Daily $ cap on Anthropic spend (rough — counts cached tokens at full price)
+  daily_cost_cap_usd: 2.00
+  # System prompt cache TTL (Claude API caches automatically; this is just a hint)
+  cache_system_prompt: true
+
+alerts:
+  # Each rule is evaluated against the latest bar of the named timeframe.
+  # `when` is a Python expression with these variables available:
+  #   price, open, high, low, close, volume,
+  #   rsi_14, ema_20, ema_50, ema_200, vwap, atr_14, macd, macd_signal
+  rules:
+    - name: NVDA daily RSI oversold in uptrend
+      ticker: NVDA
+      timeframe: daily
+      when: "rsi_14 < 35 and close > ema_50 and ema_50 > ema_200"
+      cooldown_hours: 24
+
+    - name: SPY breakout above 20-day high
+      ticker: SPY
+      timeframe: daily
+      when: "close > high_20 and volume > volume_avg_20 * 1.3"
+      cooldown_hours: 24
+
+scanner:
+  # Universes to scan
+  universes: [sp500, nasdaq100, watchlist]
+  # Minimum daily dollar volume to be eligible (filters out illiquid names)
+  min_dollar_volume: 5000000
+
+server:
+  host: 127.0.0.1
+  port: 8765
+
+audio:
+  enabled: true
+  voice: Samantha
+  sound_file: /System/Library/Sounds/Glass.aiff
+
+notifications:
+  desktop_enabled: true
+  browser_toast_enabled: true
+  slack_enabled: false

@@ -1,0 +1,55 @@
+[project]
+name = "trading-assistant"
+version = "0.1.0"
+description = "Personal swing-trading assistant: live data, LLM analysis, alerts, journal."
+requires-python = ">=3.11"
+dependencies = [
+    # Web server
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "jinja2>=3.1",
+    "websockets>=13.0",
+    # Broker
+    "schwab-py>=1.5",
+    # Market data
+    "yfinance>=0.2.40",
+    "feedparser>=6.0",
+    # Analysis
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "pandas-ta>=0.3.14b",
+    "vectorbt>=0.26",
+    # LLM
+    "anthropic>=0.40",
+    # CLI
+    "typer>=0.12",
+    "rich>=13.7",
+    "questionary>=2.0",
+    # Config / storage
+    "pydantic>=2.7",
+    "pydantic-settings>=2.4",
+    "sqlalchemy>=2.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    # Logging
+    "loguru>=0.7",
+    # HTTP client (slack, news fallback)
+    "httpx>=0.27",
+]
+
+[project.scripts]
+trader = "trader.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["trader"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.6",
+]
