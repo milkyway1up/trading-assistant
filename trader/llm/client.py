@@ -1,88 +1,111 @@
-"""Anthropic client wrapper with prompt caching."""
+"""Claude wrapper that shells out to the Claude Code CLI.
+
+Using the CLI instead of the Anthropic SDK lets the user reuse their Claude.ai
+Pro/Max subscription rather than paying separately for Anthropic API credits.
+It also sidesteps corporate TLS proxies that would otherwise block direct
+calls to api.anthropic.com.
+
+Requires:
+- `claude` on PATH (https://claude.com/claude-code)
+- `claude /login` already done with the personal Anthropic account
+- That account NOT pointed at a corporate proxy (no ANTHROPIC_BASE_URL in env)
+"""
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+import os
+import shutil
+import subprocess
 from typing import Any
 
-from anthropic import Anthropic
 from loguru import logger
 
-from trader.config import get_config, get_secrets
-
-
-@lru_cache
-def get_client() -> Anthropic:
-    secrets = get_secrets()
-    if not secrets.anthropic_api_key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY not set. Copy env.example to .env and fill in your key."
-        )
-    return Anthropic(api_key=secrets.anthropic_api_key, http_client=_build_http_client())
-
-
-def _build_http_client():
-    """httpx Client that validates TLS against the OS-native trust store
-    (macOS keychain), so corporate TLS interception like Zscaler works
-    without us having to curate a PEM bundle and dodge cert-format issues
-    that Python 3.13's stricter validator rejects."""
-    import httpx
-    try:
-        import ssl
-        import truststore
-        ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        return httpx.Client(verify=ctx, timeout=60.0)
-    except Exception as e:
-        logger.warning(f"truststore unavailable, falling back to certifi: {e}")
-        return httpx.Client(timeout=60.0)
+from trader.config import get_config
 
 
 def call_claude(
     *,
     system: str,
     user: str,
-    cache_system: bool = True,
+    cache_system: bool = True,  # ignored — Claude Code manages its own caching
     json_response: bool = True,
-    max_tokens: int = 2048,
+    max_tokens: int = 2048,  # ignored — controlled by the CLI / model defaults
 ) -> dict[str, Any] | str:
-    """Send a prompt to Claude. Caches the system block when long enough.
+    """Send a prompt to Claude via the Claude Code CLI.
 
-    Returns parsed JSON if json_response=True, otherwise raw text.
+    Returns parsed JSON if json_response=True, otherwise the raw text response.
+    Raises RuntimeError if the `claude` CLI is missing or the call fails.
     """
-    client = get_client()
+    if not shutil.which("claude"):
+        raise RuntimeError(
+            "`claude` CLI not found on PATH. Install Claude Code "
+            "(https://claude.com/claude-code), then run `claude /login` "
+            "with your personal Anthropic account."
+        )
+
     cfg = get_config()
 
-    system_blocks: list[dict[str, Any]] = [{"type": "text", "text": system}]
-    # Anthropic requires cached blocks be ≥1024 tokens (~4K chars) to be eligible.
-    # We always tag it; the API ignores the cache flag if the block is too small.
-    if cache_system and cfg.llm.cache_system_prompt:
-        system_blocks[0]["cache_control"] = {"type": "ephemeral"}
+    cmd = [
+        "claude",
+        "-p", user,
+        "--append-system-prompt", system,
+        "--output-format", "json",
+        "--model", cfg.llm.model,
+        # Single-turn: don't let Claude Code try to invoke its tools (Read,
+        # Bash, etc.). All the data Claude needs is inline in `user`.
+        "--max-turns", "1",
+    ]
 
-    response = client.messages.create(
-        model=cfg.llm.model,
-        max_tokens=max_tokens,
-        system=system_blocks,
-        messages=[{"role": "user", "content": user}],
-    )
+    # Run in a clean env that strips any corporate ANTHROPIC_* overrides,
+    # in case the parent shell still has them set.
+    env = {k: v for k, v in os.environ.items()
+           if k not in {"ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN"}}
 
-    text = "".join(
-        block.text for block in response.content if hasattr(block, "text")
-    ).strip()
+    logger.debug("Calling claude CLI (model={})", cfg.llm.model)
 
-    usage = getattr(response, "usage", None)
-    if usage:
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True,
+            timeout=120, check=False, env=env,
+        )
+    except subprocess.TimeoutExpired as e:
+        raise RuntimeError("claude CLI timed out after 120s") from e
+
+    # The CLI emits structured JSON even on API errors and exits non-zero,
+    # so prefer parsing stdout over trusting the exit code.
+    if not proc.stdout.strip():
+        raise RuntimeError(
+            f"claude CLI exited {proc.returncode} with empty stdout. "
+            f"stderr: {(proc.stderr or '').strip()[:300]}"
+        )
+
+    try:
+        wrapper = json.loads(proc.stdout)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(
+            f"claude CLI returned non-JSON: {proc.stdout[:300]}"
+        ) from e
+
+    if wrapper.get("is_error"):
+        raise RuntimeError(
+            f"Claude API error (status={wrapper.get('api_error_status')}): "
+            f"{(wrapper.get('result') or '')[:500]}"
+        )
+
+    text = (wrapper.get("result") or "").strip()
+
+    usage = wrapper.get("usage") or {}
+    if usage or "total_cost_usd" in wrapper:
         logger.debug(
-            "Claude usage — input={}, output={}, cache_read={}, cache_create={}",
-            getattr(usage, "input_tokens", 0),
-            getattr(usage, "output_tokens", 0),
-            getattr(usage, "cache_read_input_tokens", 0),
-            getattr(usage, "cache_creation_input_tokens", 0),
+            "Claude usage — input={}, output={}, cost_usd={}",
+            usage.get("input_tokens", 0),
+            usage.get("output_tokens", 0),
+            wrapper.get("total_cost_usd"),
         )
 
     if not json_response:
         return text
 
-    # Strip code fences if Claude wrapped its JSON
     cleaned = text
     if cleaned.startswith("```"):
         cleaned = cleaned.split("```", 2)[1]
