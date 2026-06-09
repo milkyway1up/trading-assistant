@@ -64,8 +64,9 @@ class ServerConfig(BaseModel):
 
 class AudioConfig(BaseModel):
     enabled: bool = True
-    voice: str = "Samantha"
-    sound_file: str = "/System/Library/Sounds/Glass.aiff"
+    voice: str = "Samantha"  # macOS-only; ignored on Windows/Linux TTS engines
+    # Empty string = let the audio module pick a platform-appropriate default.
+    sound_file: str = ""
 
 
 class NotificationsConfig(BaseModel):
