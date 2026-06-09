@@ -2,7 +2,7 @@
 name = "trading-assistant"
 version = "0.1.0"
 description = "Personal swing-trading assistant: live data, LLM analysis, alerts, journal."
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     # Web server
     "fastapi>=0.115",
@@ -35,6 +35,8 @@ dependencies = [
     "loguru>=0.7",
     # HTTP client (slack, news fallback)
     "httpx>=0.27",
+    # Desktop window (native WKWebView on macOS — wraps the FastAPI dashboard)
+    "pywebview>=5.3",
 ]
 
 [project.scripts]
@@ -52,4 +54,8 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "ruff>=0.6",
+]
+app = [
+    # Bundling: `uv sync --group app` then `uv run python setup_app.py py2app`
+    "py2app>=0.28",
 ]

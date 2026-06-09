@@ -45,6 +45,22 @@ def serve(
 
 
 # ─────────────────────────────────────────────────────────────────
+# desktop — launch as a native window
+# ─────────────────────────────────────────────────────────────────
+@app.command()
+def desktop(
+    port: Optional[int] = typer.Option(None, help="Override server port"),
+    width: int = typer.Option(1400, help="Window width"),
+    height: int = typer.Option(900, help="Window height"),
+    debug: bool = typer.Option(False, "--debug", help="Enable WKWebView devtools"),
+):
+    """Open the dashboard in a native macOS window (no browser tab)."""
+    from trader.desktop import launch
+
+    launch(port=port, width=width, height=height, debug=debug)
+
+
+# ─────────────────────────────────────────────────────────────────
 # analyze — LLM thesis on a ticker
 # ─────────────────────────────────────────────────────────────────
 @app.command()

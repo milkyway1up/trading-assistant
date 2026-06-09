@@ -53,10 +53,25 @@ uv run trader prep
 # After Schwab approval — initial OAuth dance (browser-based, ~30 sec):
 uv run trader auth login
 
-# Launch dashboard:
+# Launch dashboard in a browser tab:
 uv run trader serve
 # → open http://localhost:8765
+
+# Or launch as a native macOS window (no browser needed):
+uv run trader desktop
 ```
+
+### 4. (Optional) Build a standalone `.app`
+
+To get a real Applications-folder app you can launch from Spotlight, build with py2app:
+
+```bash
+uv sync --group app
+uv run python setup_app.py py2app
+# → dist/Trading Assistant.app
+```
+
+Drag `dist/Trading Assistant.app` to `/Applications`. Double-click to launch — no terminal, no `uv run`.
 
 ---
 
@@ -80,6 +95,7 @@ uv run trader serve
 | Command | What it does |
 |---|---|
 | `trader serve` | Launches the web dashboard at `http://localhost:8765` |
+| `trader desktop` | Same dashboard, but in a native WKWebView window (no browser tab) |
 | `trader auth login` | Schwab OAuth flow (browser-based) |
 | `trader auth status` | Show token expiry |
 | `trader analyze TSLA` | Claude reads news + bars and produces a structured thesis |
