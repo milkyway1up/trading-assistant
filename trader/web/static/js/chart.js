@@ -21,6 +21,7 @@ const CHART_COLORS = {
 
 function makeChart(el, opts = {}) {
   return LightweightCharts.createChart(el, {
+    autoSize: true,
     layout: {
       background: { color: CHART_COLORS.background },
       textColor: CHART_COLORS.text,
@@ -69,13 +70,7 @@ function initCharts() {
     if (range) rsiChart.timeScale().setVisibleRange(range);
   });
 
-  // Resize handlers
-  window.addEventListener("resize", () => {
-    mainChart.applyOptions({ width: chartEl.clientWidth, height: chartEl.clientHeight });
-    rsiChart.applyOptions({ width: rsiEl.clientWidth, height: rsiEl.clientHeight });
-  });
-  mainChart.applyOptions({ width: chartEl.clientWidth, height: chartEl.clientHeight });
-  rsiChart.applyOptions({ width: rsiEl.clientWidth, height: rsiEl.clientHeight });
+  // autoSize handles resize — no manual handler needed.
 }
 
 // EMA implementation (client-side; backend will provide pre-computed for perf later)
