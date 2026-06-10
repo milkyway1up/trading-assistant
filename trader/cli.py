@@ -17,7 +17,7 @@ app = typer.Typer(
 console = Console()
 
 # Subcommand groups
-auth_app = typer.Typer(help="Schwab OAuth flow.")
+auth_app = typer.Typer(help="Broker authentication (Alpaca keys / Schwab OAuth).")
 journal_app = typer.Typer(help="Trade journal: sync, annotate, stats.")
 app.add_typer(auth_app, name="auth")
 app.add_typer(journal_app, name="journal")
@@ -133,23 +133,32 @@ def order(
 # ─────────────────────────────────────────────────────────────────
 @auth_app.command("login")
 def auth_login():
-    """Run the Schwab OAuth browser flow."""
-    from trader.broker.auth import run_oauth_flow
-    run_oauth_flow()
+    """Authenticate with the configured broker.
+
+    - Alpaca: validates ALPACA_API_KEY / ALPACA_SECRET_KEY by hitting /v2/account.
+    - Schwab: runs the OAuth browser flow.
+    """
+    from trader.broker.auth import run_auth
+    result = run_auth()
+    console.print(result)
 
 
 @auth_app.command("status")
 def auth_status():
-    """Show Schwab token status and expiry."""
-    from trader.broker.auth import token_status
-    status = token_status()
-    console.print(status)
+    """Show broker auth status (keys valid? token expiry? account snapshot?)."""
+    from trader.broker.auth import auth_status as _auth_status
+    console.print(_auth_status())
 
 
 @auth_app.command("refresh")
 def auth_refresh():
-    """Force a refresh of the Schwab access token."""
+    """Force a refresh of the Schwab access token. (Alpaca: no-op.)"""
+    from trader.config import get_config
     from trader.broker.auth import refresh_token
+
+    if get_config().broker.provider == "alpaca":
+        console.print("[yellow]Alpaca uses static API keys — nothing to refresh.[/yellow]")
+        return
     refresh_token()
 
 

@@ -1,4 +1,9 @@
-"""Schwab WebSocket streamer (LEVELONE_EQUITIES + CHART_EQUITY). Phase 1."""
+"""Schwab WebSocket streamer — kept as a separate module for the live tick path.
+
+The factory currently returns `SchwabRestDataClient` which inlines its own
+`start_stream` stub; if/when the streaming wiring lands in Phase 1 it can be
+moved here and `SchwabRestDataClient.start_stream` can delegate.
+"""
 from __future__ import annotations
 
 

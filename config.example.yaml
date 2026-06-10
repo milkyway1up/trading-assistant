@@ -30,6 +30,15 @@ llm:
   # System prompt cache TTL (Claude API caches automatically; this is just a hint)
   cache_system_prompt: true
 
+broker:
+  # Which broker handles orders + market data.
+  #   alpaca  — instant signup, free paper trading, fractional shares supported
+  #   schwab  — requires developer.schwab.com app approval (1–3 business days)
+  provider: alpaca
+  # Alpaca paper trading vs live. Start with `true`. Flip to `false` only after
+  # you've validated the workflow end-to-end on paper for at least a few weeks.
+  paper: true
+
 alerts:
   # Each rule is evaluated against the latest bar of the named timeframe.
   # `when` is a Python expression with these variables available:

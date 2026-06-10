@@ -1,13 +1,16 @@
 # Trading Assistant
 
-Personal swing-trading assistant for a Schwab cash account. Runs locally on **macOS, Windows, or Linux**.
+Personal swing-trading assistant. Runs locally on **macOS, Windows, or Linux**.
 
 - **Browser dashboard** at `localhost:8765` with TradingView-style candlestick charts (Daily / 4H / 1H / 15m), watchlist, indicators, and live alerts.
 - **In-app Settings panel** — paste API keys, edit watchlist, tune risk caps without touching `.env` or YAML files.
 - **CLI** for scanning setups, running LLM analysis (`trader analyze TSLA`), generating weekly prep docs (`trader prep`), submitting orders, and journal management.
-- **Schwab API** for live data + order execution (cash account; PDT-free).
+- **Two broker backends, same UI:**
+  - **Alpaca** (default) — instant signup, free paper trading, fractional shares. Trade today.
+  - **Schwab cash account** — live data + order execution once the developer.schwab.com app is approved (1–3 business days). PDT-free.
+  - Switched via one line in `config.yaml`: `broker.provider: alpaca` or `schwab`.
 - **Claude (via Claude Code CLI)** for thesis generation, weekly research, and exit grading — uses your Claude.ai Pro/Max subscription, not separate API credits.
-- **Trade journal** auto-populates from Schwab order history; Claude grades each closed trade against the entry thesis.
+- **Trade journal** auto-populates from broker order history; Claude grades each closed trade against the entry thesis.
 
 > ⚠ **This is a personal tool.** Always paper-trade your strategies first. The risk guard blocks the most common small-account mistakes (oversizing, too-wide stops, exceeding settled cash) but you are responsible for every trade.
 
@@ -86,9 +89,26 @@ Drag `dist/Trading Assistant.app` to `/Applications`. Double-click to launch —
 
 ---
 
-## Schwab account setup (one-time, has 1–3 day lead time)
+## Alpaca account setup (instant — start here)
 
-Do this in parallel with the local install — Schwab approval is the long pole.
+Alpaca is the **default broker**. No approval wait, free paper trading from minute one, same SDK switches to live trading later.
+
+1. Sign up at [alpaca.markets](https://alpaca.markets) — instant, no funding required to start paper trading.
+2. In the Alpaca dashboard: **Paper Trading → API Keys → Generate**.
+3. Open Settings (⚙) in the trading assistant dashboard and paste the **Alpaca API Key + Secret Key**.
+4. Run `uv run trader auth status` — should show `status: ok` with your account equity.
+5. Trade away. Paper-trading orders go through the same code path as live orders; the only difference is `broker.paper: true` in `config.yaml`.
+
+**Going live (later):**
+- Generate **Live Trading** API keys in Alpaca.
+- Replace the paper keys in Settings.
+- Flip `broker.paper: false` in `config.yaml`.
+
+---
+
+## Schwab account setup (optional, 1–3 day lead time)
+
+Skip this section if you're sticking with Alpaca. Set `broker.provider: schwab` in `config.yaml` once you've completed the steps below.
 
 1. **Open a Schwab cash account** at [schwab.com](https://www.schwab.com). Free, $0 minimum. **Pick a CASH account, not margin** — small accounts should avoid the PDT rule.
 2. Once funded with even $1, register at [developer.schwab.com](https://developer.schwab.com) → "Individual Developer".
@@ -134,8 +154,8 @@ If a backend is missing on any platform, alerts degrade silently — no crashes 
 |---|---|
 | `trader serve` | Launches the web dashboard at `http://localhost:8765` |
 | `trader desktop` | Same dashboard, but in a native window (no browser tab) |
-| `trader auth login` | Schwab OAuth flow (browser-based) |
-| `trader auth status` | Show token expiry |
+| `trader auth login` | Authenticate the configured broker (Alpaca: validates keys; Schwab: OAuth browser flow) |
+| `trader auth status` | Show broker auth state (account snapshot for Alpaca, token expiry for Schwab) |
 | `trader analyze TSLA` | Claude reads news + bars and produces a structured thesis |
 | `trader prep` | Generates a weekly research markdown doc in `prep/` |
 | `trader scan` | Runs all setup detectors across the universe; ranks results |
@@ -153,12 +173,15 @@ If a backend is missing on any platform, alerts degrade silently — no crashes 
 Two files, both editable from the in-app Settings panel:
 
 ### `.env` (secrets)
-- `SCHWAB_APP_KEY`, `SCHWAB_APP_SECRET`, `SCHWAB_CALLBACK_URL` — Schwab developer app credentials
+- `ALPACA_API_KEY`, `ALPACA_SECRET_KEY` — Alpaca paper or live keys
+- `SCHWAB_APP_KEY`, `SCHWAB_APP_SECRET`, `SCHWAB_CALLBACK_URL` — Schwab developer app credentials (only if `broker.provider: schwab`)
 - `SLACK_WEBHOOK_URL` — optional, for Slack alert delivery
 - `ANTHROPIC_API_KEY` — **unused by default** (LLM path goes through Claude Code CLI). Reserved for a future SDK fallback.
 
 ### `config.yaml` (preferences)
 - `watchlist` — tickers to track
+- `broker.provider` — `alpaca` (default) or `schwab`
+- `broker.paper` — Alpaca only; `true` = paper trading, `false` = live
 - `risk.*` — position sizing caps (max risk per trade %, max position %, max stop distance %, default risk %)
 - `llm.model` — which Claude model to invoke (default `claude-sonnet-4-6`)
 - `alerts.rules` — your alert conditions (DSL evaluated each new bar)
@@ -175,12 +198,12 @@ trader/
 ├── cli.py                  # typer CLI entrypoint
 ├── desktop.py              # pywebview launcher (cross-platform)
 ├── config.py               # pydantic-settings + secret/config mutators
-├── data/                   # Schwab REST/WS + yfinance fallback
+├── data/                   # Alpaca + Schwab REST/WS + yfinance fallback (DataClient ABC)
 ├── indicators/             # pandas-ta wrappers + S/R levels
 ├── setups/                 # swing-trade setup detectors (breakout, flag, pullback, ...)
 ├── scanner/                # universe + ranked setup scan
 ├── alerts/                 # rule engine + cross-platform audio/desktop/browser notifiers
-├── broker/                 # Schwab client + auth + orders + risk_guard + settlement
+├── broker/                 # BrokerClient ABC + Alpaca + Schwab + auth + orders + risk_guard + settlement + factory
 ├── sizing/                 # position-size calculator
 ├── llm/                    # Claude Code CLI wrapper + analysis + prep + grading
 ├── backtest/               # vectorbt wrapper + sample strategies

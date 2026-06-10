@@ -75,14 +75,14 @@ def analyze_ticker(ticker: str, with_position: bool = False) -> dict[str, Any]:
     context = _fetch_context(ticker)
 
     if with_position:
-        # Hook for Phase 3 — pull current Schwab position context if any
+        # Pull current broker position (Alpaca/Schwab) if one exists.
         try:
-            from trader.broker.schwab import get_position
-            pos = get_position(ticker)
+            from trader.broker.factory import get_broker
+            pos = get_broker().get_position(ticker)
             if pos:
                 context["current_position"] = pos
         except Exception as e:
-            logger.debug("No Schwab position context (broker not yet wired): {}", e)
+            logger.debug("No broker position context: {}", e)
 
     user_msg = (
         f"Analyze the following ticker and produce a structured thesis as JSON only.\n\n"

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -24,6 +24,8 @@ class Secrets(BaseSettings):
     schwab_app_key: str = ""
     schwab_app_secret: str = ""
     schwab_callback_url: str = "https://127.0.0.1:8182"
+    alpaca_api_key: str = ""
+    alpaca_secret_key: str = ""
     slack_webhook_url: str = ""
 
 
@@ -38,6 +40,16 @@ class LLMConfig(BaseModel):
     model: str = "claude-sonnet-4-6"
     daily_cost_cap_usd: float = 2.00
     cache_system_prompt: bool = True
+
+
+class BrokerConfig(BaseModel):
+    """Which broker the order/data layer talks to.
+
+    `alpaca` works the moment you paste API keys (paper trading is instant).
+    `schwab` requires the developer.schwab.com app approval (1–3 business days).
+    """
+    provider: Literal["schwab", "alpaca"] = "alpaca"
+    paper: bool = True  # Alpaca: route to paper-trading endpoint
 
 
 class AlertRule(BaseModel):
@@ -80,6 +92,7 @@ class AppConfig(BaseModel):
     watchlist: list[str] = Field(default_factory=list)
     risk: RiskConfig = Field(default_factory=RiskConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
+    broker: BrokerConfig = Field(default_factory=BrokerConfig)
     alerts: AlertsConfig = Field(default_factory=AlertsConfig)
     scanner: ScannerConfig = Field(default_factory=ScannerConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
@@ -127,7 +140,8 @@ CONFIG_PATH = PROJECT_ROOT / "config.yaml"
 ENV_PATH = PROJECT_ROOT / ".env"
 _ENV_KEYS = {
     "anthropic_api_key", "schwab_app_key", "schwab_app_secret",
-    "schwab_callback_url", "slack_webhook_url",
+    "schwab_callback_url", "alpaca_api_key", "alpaca_secret_key",
+    "slack_webhook_url",
 }
 
 

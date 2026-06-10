@@ -26,10 +26,16 @@ _YF_PARAMS: dict[str, tuple[str, str]] = {
 async def get_bars(ticker: str, timeframe: Timeframe = "1d") -> dict:
     """Return OHLCV bars for a ticker at the requested timeframe.
 
-    Tries yfinance; falls back to mock data on any failure so the dashboard
-    always has something to render.
+    Tries the configured broker's data client (Alpaca by default) → yfinance
+    → deterministic mock data, so the dashboard always has something to render.
     """
     ticker = ticker.upper()
+
+    try:
+        return _broker_bars(ticker, timeframe)
+    except Exception as e:
+        broker_err = str(e)
+
     try:
         return _yfinance_bars(ticker, timeframe)
     except Exception as e:
@@ -37,32 +43,46 @@ async def get_bars(ticker: str, timeframe: Timeframe = "1d") -> dict:
             "ticker": ticker,
             "timeframe": timeframe,
             "source": "mock",
-            "error": str(e),
+            "error": f"broker={broker_err}; yfinance={e}",
             "bars": _mock_bars(ticker, timeframe),
         }
 
 
 @router.get("/quote/{ticker}")
 async def get_quote(ticker: str) -> dict:
-    """Latest quote (last price + day change). yfinance for now."""
+    """Latest quote (last price + day change). Tries broker → yfinance → mock."""
     ticker = ticker.upper()
     try:
-        import yfinance as yf
-        info = yf.Ticker(ticker).fast_info
-        last = float(info.get("last_price") or info.get("lastPrice") or 0)
-        prev = float(info.get("previous_close") or info.get("previousClose") or 0)
-        chg = last - prev
-        chg_pct = (chg / prev * 100.0) if prev else 0.0
-        return {
-            "ticker": ticker,
-            "price": round(last, 2),
-            "change": round(chg, 2),
-            "change_pct": round(chg_pct, 2),
-            "source": "yfinance",
-            "ts": time.time(),
-        }
-    except Exception as e:
-        return _mock_quote(ticker, error=str(e))
+        from trader.broker.factory import get_data_client
+        return get_data_client().get_quote(ticker)
+    except Exception as broker_err:
+        try:
+            import yfinance as yf
+            info = yf.Ticker(ticker).fast_info
+            last = float(info.get("last_price") or info.get("lastPrice") or 0)
+            prev = float(info.get("previous_close") or info.get("previousClose") or 0)
+            chg = last - prev
+            chg_pct = (chg / prev * 100.0) if prev else 0.0
+            return {
+                "ticker": ticker,
+                "price": round(last, 2),
+                "change": round(chg, 2),
+                "change_pct": round(chg_pct, 2),
+                "source": "yfinance",
+                "ts": time.time(),
+            }
+        except Exception as yf_err:
+            return _mock_quote(ticker, error=f"broker={broker_err}; yfinance={yf_err}")
+
+
+def _broker_bars(ticker: str, timeframe: str) -> dict:
+    from trader.broker.factory import get_data_client
+
+    period = _YF_PARAMS[timeframe][1]  # reuse our period mapping
+    df = get_data_client().get_price_history(ticker, timeframe=timeframe, period=period)
+    if df.empty:
+        raise ValueError(f"No bars from broker for {ticker} {timeframe}")
+    return _df_to_bars_response(ticker, timeframe, df, source="broker")
 
 
 def _yfinance_bars(ticker: str, timeframe: str) -> dict:
@@ -72,7 +92,10 @@ def _yfinance_bars(ticker: str, timeframe: str) -> dict:
     df = yf.Ticker(ticker).history(period=period, interval=interval, auto_adjust=False)
     if df.empty:
         raise ValueError(f"No data from yfinance for {ticker} {timeframe}")
+    return _df_to_bars_response(ticker, timeframe, df, source="yfinance")
 
+
+def _df_to_bars_response(ticker: str, timeframe: str, df, source: str) -> dict:
     bars = []
     for idx, row in df.iterrows():
         ts = int(idx.timestamp()) if hasattr(idx, "timestamp") else int(time.time())
@@ -84,11 +107,10 @@ def _yfinance_bars(ticker: str, timeframe: str) -> dict:
             "close": float(row["Close"]),
             "volume": float(row.get("Volume", 0) or 0),
         })
-
     return {
         "ticker": ticker,
         "timeframe": timeframe,
-        "source": "yfinance",
+        "source": source,
         "bars": bars,
     }
 
