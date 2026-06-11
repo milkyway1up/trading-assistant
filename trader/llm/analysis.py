@@ -8,7 +8,7 @@ import yfinance as yf
 from loguru import logger
 
 from trader.llm.client import call_claude
-from trader.llm.prompts import ANALYST_SYSTEM, SETUP_RATER_SYSTEM
+from trader.llm.prompts import ANALYST_SYSTEM, MOMENTUM_RATER_SYSTEM, SETUP_RATER_SYSTEM
 
 
 def _fetch_context(ticker: str) -> dict[str, Any]:
@@ -169,6 +169,46 @@ def rate_setup(ticker: str, setup: dict[str, Any]) -> dict[str, Any]:
     except (TypeError, ValueError):
         rating = None
     return {"rating": rating, "reason": result.get("reason", "")}
+
+
+def rate_momentum(ticker: str, social: dict[str, Any]) -> dict[str, Any]:
+    """Claude rating for a socially-trending ticker, pump-risk aware.
+
+    `social` is the row from `trader.data.trending.fetch_trending` for this ticker
+    — mention count, 24h delta, source list, last_price, etc. The system prompt
+    is tuned for the "is this a pump?" question rather than a swing setup.
+
+    Returns {"rating": int 1-10 | None, "pump_risk": "low|medium|high",
+    "verdict": "tradeable|watch|avoid", "reason": str}.
+    """
+    ticker = ticker.upper()
+    context = _fetch_context_light(ticker)
+    context["social"] = social
+
+    user_msg = f"Rate this socially-trending ticker:\n```json\n{_compact_json(context)}\n```"
+    result = call_claude(
+        system=MOMENTUM_RATER_SYSTEM,
+        user=user_msg,
+        cache_system=True,
+        json_response=True,
+        max_tokens=250,
+    )
+    if not isinstance(result, dict):
+        return {
+            "rating": None, "pump_risk": "high", "verdict": "avoid",
+            "reason": f"non-dict response: {result!r}",
+        }
+    rating = result.get("rating")
+    try:
+        rating = int(rating) if rating is not None else None
+    except (TypeError, ValueError):
+        rating = None
+    return {
+        "rating": rating,
+        "pump_risk": result.get("pump_risk", "medium"),
+        "verdict": result.get("verdict", "watch"),
+        "reason": result.get("reason", ""),
+    }
 
 
 def _compact_json(obj: Any) -> str:

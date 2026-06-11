@@ -104,3 +104,25 @@ async def update_config(body: ConfigUpdate) -> dict[str, Any]:
             pass
 
     return {"status": "ok", "config": new_cfg.model_dump()}
+
+
+class WatchlistAddBody(BaseModel):
+    ticker: str
+
+
+@router.post("/watchlist/add")
+async def watchlist_add(body: WatchlistAddBody) -> dict[str, Any]:
+    """Append a ticker to the watchlist in config.yaml (idempotent, uppercased)."""
+    ticker = (body.ticker or "").upper().strip()
+    if not ticker or not ticker.replace(".", "").replace("-", "").isalnum():
+        raise HTTPException(status_code=400, detail="invalid ticker")
+    cfg = get_config()
+    current = list(cfg.watchlist or [])
+    if ticker in current:
+        return {"status": "exists", "watchlist": current}
+    current.append(ticker)
+    try:
+        new_cfg = save_config({"watchlist": current})
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors())
+    return {"status": "added", "watchlist": new_cfg.watchlist}

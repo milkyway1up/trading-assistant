@@ -65,6 +65,22 @@
         </div>
         <ul id="setups-list" class="text-xs"></ul>
       </div>
+
+      <div class="border-t border-slate-800 mt-2">
+        <div class="px-3 py-2 flex items-center justify-between">
+          <span class="text-xs uppercase text-slate-500" title="Reddit (WSB / r/stocks / r/pennystocks / r/daytrading) + StockTwits trending">Trending</span>
+          <div class="flex items-center gap-2">
+            <label class="text-[10px] text-slate-500 flex items-center gap-1 cursor-pointer" title="Include sub-$5 names">
+              <input id="trending-pennies-toggle" type="checkbox" checked class="accent-cyan-500" />
+              pennies
+            </label>
+            <button id="trending-refresh" class="text-xs text-cyan-400 hover:underline" title="Fetch trending tickers from Reddit + StockTwits">scan</button>
+          </div>
+        </div>
+        <ul id="trending-list" class="text-xs">
+          <li class="px-3 py-1 text-slate-500">click scan</li>
+        </ul>
+      </div>
     </aside>
 
     <!-- Chart -->
@@ -398,6 +414,7 @@
 <script src="/static/js/orders.js"></script>
 <script src="/static/js/analyze.js"></script>
 <script src="/static/js/setups.js"></script>
+<script src="/static/js/trending.js"></script>
 <script>
   initDashboard({
     defaultTicker: {{ default_ticker | tojson }},
@@ -408,5 +425,6 @@
   initOrders();
   initAnalyze();
   initSetups();
+  initTrending();
 </script>
 {% endblock %}
