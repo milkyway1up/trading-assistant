@@ -1,8 +1,18 @@
 // orders.js — order ticket modal: preview + submit.
 
 let lastPreview = null;
+let defaultRiskPct = 1.0;
 
 function $(id) { return document.getElementById(id); }
+
+async function loadDefaultRisk() {
+  try {
+    const res = await fetch("/api/settings");
+    const data = await res.json();
+    const r = data?.config?.risk?.default_risk_pct;
+    if (typeof r === "number" && r > 0) defaultRiskPct = r;
+  } catch (e) { /* keep fallback 1.0 */ }
+}
 
 function openOrderModal() {
   const ticker = window.getActiveTicker ? window.getActiveTicker() : "SPY";
@@ -11,7 +21,7 @@ function openOrderModal() {
   $("order-entry").value = "";
   $("order-stop").value = "";
   $("order-target").value = "";
-  $("order-risk").value = "1.0";
+  $("order-risk").value = defaultRiskPct;
   $("order-qty").value = "";
   $("order-type").value = "limit";
   $("order-preview").innerHTML = `<div class="text-slate-500">Fill in entry + stop, then click Preview.</div>`;
@@ -20,6 +30,32 @@ function openOrderModal() {
   lastPreview = null;
   $("order-modal").classList.remove("hidden");
 }
+
+window.openOrderFromSetup = function (setup) {
+  $("order-ticker").value = setup.ticker;
+  $("order-side").value = (setup.side === "sell") ? "sell" : "buy";
+  $("order-entry").value = setup.entry ?? "";
+  $("order-stop").value = setup.stop ?? "";
+  $("order-target").value = setup.target ?? "";
+  $("order-risk").value = defaultRiskPct;
+  $("order-qty").value = "";
+  $("order-type").value = "bracket";
+
+  const conf = setup.confidence != null ? `${(setup.confidence * 100).toFixed(0)}%` : "—";
+  const setupName = setup.setup || setup.setup_type || "setup";
+  const reason = setup.reason || "";
+  $("order-preview").innerHTML = `
+    <div class="text-cyan-400 font-bold mb-1">${setupName} · ${conf} confidence</div>
+    ${reason ? `<div class="text-slate-400 text-xs mb-1">${reason}</div>` : ""}
+    <div class="text-slate-500">Auto-previewing…</div>
+  `;
+  $("order-submit-btn").disabled = true;
+  $("order-status").textContent = "";
+  lastPreview = null;
+  $("order-modal").classList.remove("hidden");
+
+  setTimeout(() => previewOrder(), 100);
+};
 
 function closeOrderModal() {
   $("order-modal").classList.add("hidden");
@@ -121,6 +157,7 @@ async function submitOrder() {
 }
 
 window.initOrders = function () {
+  loadDefaultRisk();
   $("order-btn").addEventListener("click", openOrderModal);
   $("order-close").addEventListener("click", closeOrderModal);
   $("order-preview-btn").addEventListener("click", previewOrder);
