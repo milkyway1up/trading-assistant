@@ -140,10 +140,11 @@ async function saveSettings() {
         return;
       }
     }
-    showStatus("Saved. Reload to apply watchlist changes.", "success");
-    await loadSettings();  // refresh status indicators
-    // Clear password inputs so they don't linger in DOM
+    await loadSettings();
     document.querySelectorAll('[data-secret][type="password"]').forEach((el) => el.value = "");
+    const el = document.getElementById("settings-status");
+    el.innerHTML = `<span class="text-green-400">Saved.</span> <button id="settings-reload-btn" class="ml-2 px-2 py-0.5 text-xs rounded border border-cyan-500 text-cyan-400 hover:bg-cyan-700 hover:text-white">Reload</button>`;
+    document.getElementById("settings-reload-btn").addEventListener("click", () => window.location.reload());
   } catch (e) {
     showStatus(`Save failed: ${e.message}`, "error");
   }
