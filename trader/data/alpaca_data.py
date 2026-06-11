@@ -1,9 +1,8 @@
 """Alpaca market-data client.
 
 Pulls historical bars + latest quotes from Alpaca's data API and exposes a
-real-time tick stream over WebSocket. Free Alpaca accounts get the IEX feed;
-paid plans get full SIP. We don't care which is configured at this layer —
-the SDK routes for us.
+real-time tick stream over WebSocket. Defaults to the IEX feed (free tier);
+set feed=DataFeed.SIP in requests if you have a paid data subscription.
 
 Docs: https://alpaca.markets/docs/api-references/market-data-api/
 """
@@ -67,6 +66,7 @@ class AlpacaDataClient(DataClient):
         timeframe: str,
         period: str,
     ) -> pd.DataFrame:
+        from alpaca.data.enums import DataFeed
         from alpaca.data.requests import StockBarsRequest
         from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
@@ -84,6 +84,7 @@ class AlpacaDataClient(DataClient):
             timeframe=tf,
             start=start,
             end=end,
+            feed=DataFeed.IEX,
         )
         bars = self._client.get_stock_bars(req)
         df = bars.df  # MultiIndex (symbol, timestamp)
@@ -103,12 +104,13 @@ class AlpacaDataClient(DataClient):
 
     # ── Quote ─────────────────────────────────────────────────────
     def get_quote(self, ticker: str) -> dict[str, Any]:
+        from alpaca.data.enums import DataFeed
         from alpaca.data.requests import StockLatestQuoteRequest, StockLatestTradeRequest
 
         ticker = ticker.upper()
         try:
             trade_resp = self._client.get_stock_latest_trade(
-                StockLatestTradeRequest(symbol_or_symbols=ticker)
+                StockLatestTradeRequest(symbol_or_symbols=ticker, feed=DataFeed.IEX)
             )
             last = float(trade_resp[ticker].price)
         except Exception as e:
@@ -155,7 +157,9 @@ class AlpacaDataClient(DataClient):
                 "source": "alpaca",
             })
 
-        stream = StockDataStream(self._api_key, self._secret_key)
+        from alpaca.data.enums import DataFeed
+
+        stream = StockDataStream(self._api_key, self._secret_key, feed=DataFeed.IEX)
         stream.subscribe_trades(_on_trade, *[t.upper() for t in tickers])
 
         # Run the SDK's blocking event loop on a background task. The SDK

@@ -115,7 +115,7 @@ function rsi(closes, period = 14) {
   return out;
 }
 
-async function loadTicker(ticker, timeframe) {
+async function _loadTicker(ticker, timeframe) {
   activeTicker = ticker;
   activeTimeframe = timeframe;
   document.getElementById("active-ticker").textContent = ticker;
@@ -163,7 +163,7 @@ function wireTimeframeButtons() {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".tf-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      loadTicker(activeTicker, btn.dataset.tf);
+      _loadTicker(activeTicker, btn.dataset.tf);
     });
   });
 }
@@ -173,7 +173,7 @@ function wireWatchlist() {
     item.addEventListener("click", () => {
       document.querySelectorAll(".watch-item").forEach((i) => i.classList.remove("active"));
       item.classList.add("active");
-      loadTicker(item.dataset.ticker, activeTimeframe);
+      _loadTicker(item.dataset.ticker, activeTimeframe);
     });
   });
 }
@@ -197,10 +197,10 @@ window.initDashboard = function (opts) {
   initCharts();
   wireTimeframeButtons();
   wireWatchlist();
-  loadTicker(opts.defaultTicker, "1d");
+  _loadTicker(opts.defaultTicker, "1d");
   refreshWatchlistQuotes(opts.watchlist);
   setInterval(() => refreshWatchlistQuotes(opts.watchlist), 30_000);
 };
 
-window.loadTicker = (ticker) => loadTicker(ticker, activeTimeframe);
+window.loadTicker = (ticker) => _loadTicker(ticker, activeTimeframe);
 window.getActiveTicker = () => activeTicker;
