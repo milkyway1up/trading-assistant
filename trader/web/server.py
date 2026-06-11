@@ -27,10 +27,11 @@ def create_app() -> FastAPI:
     templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
     # Routers
-    from trader.web.api import quotes, settings, stream
+    from trader.web.api import quotes, settings, setups, stream
 
     app.include_router(quotes.router, prefix="/api")
     app.include_router(settings.router, prefix="/api")
+    app.include_router(setups.router, prefix="/api")
     app.include_router(stream.router)
 
     @app.get("/", response_class=HTMLResponse)

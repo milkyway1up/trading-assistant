@@ -46,6 +46,14 @@ async function loadSettings() {
     const input = document.querySelector(`[data-risk="${k}"]`);
     if (input) input.value = v;
   }
+
+  // Broker
+  const broker = data.config.broker || {};
+  document.querySelectorAll('[data-broker="provider"]').forEach((el) => {
+    el.checked = el.value === (broker.provider || "alpaca");
+  });
+  const paperEl = document.querySelector('[data-broker="paper"]');
+  if (paperEl) paperEl.checked = !!broker.paper;
 }
 
 function readSecretsForm() {
@@ -85,6 +93,14 @@ function readConfigForm() {
     }
   });
   if (Object.keys(risk).length) out.risk = { ..._initialConfig.risk, ...risk };
+
+  // Broker
+  const provider = document.querySelector('[data-broker="provider"]:checked')?.value;
+  const paper = document.querySelector('[data-broker="paper"]')?.checked;
+  const initialBroker = _initialConfig?.broker || {};
+  if (provider && (provider !== initialBroker.provider || paper !== !!initialBroker.paper)) {
+    out.broker = { ...initialBroker, provider, paper: !!paper };
+  }
 
   return out;
 }
