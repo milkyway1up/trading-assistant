@@ -8,7 +8,7 @@ import yfinance as yf
 from loguru import logger
 
 from trader.llm.client import call_claude
-from trader.llm.prompts import ANALYST_SYSTEM
+from trader.llm.prompts import ANALYST_SYSTEM, SETUP_RATER_SYSTEM
 
 
 def _fetch_context(ticker: str) -> dict[str, Any]:
@@ -100,6 +100,75 @@ def analyze_ticker(ticker: str, with_position: bool = False) -> dict[str, Any]:
     if isinstance(result, dict):
         result.setdefault("ticker", ticker)
     return result if isinstance(result, dict) else {"ticker": ticker, "raw": result}
+
+
+def _fetch_context_light(ticker: str) -> dict[str, Any]:
+    """Lightweight context for setup rating: 30d daily bars + news, no hourly."""
+    yf_ticker = yf.Ticker(ticker)
+
+    daily = yf_ticker.history(period="3mo", interval="1d", auto_adjust=False)
+    daily_rows = []
+    for idx, row in daily.tail(30).iterrows():
+        daily_rows.append({
+            "date": idx.strftime("%Y-%m-%d"),
+            "open": round(float(row["Open"]), 2),
+            "high": round(float(row["High"]), 2),
+            "low": round(float(row["Low"]), 2),
+            "close": round(float(row["Close"]), 2),
+            "volume": int(row["Volume"]) if row["Volume"] == row["Volume"] else 0,
+        })
+
+    news = []
+    try:
+        for n in (yf_ticker.news or [])[:5]:
+            content = n.get("content") or n
+            news.append({
+                "title": content.get("title") or content.get("headline", ""),
+                "publisher": (content.get("provider") or {}).get("displayName")
+                              or content.get("publisher", ""),
+                "published": content.get("pubDate") or content.get("providerPublishTime", ""),
+            })
+    except Exception as e:
+        logger.debug("News fetch failed for {}: {}", ticker, e)
+
+    info = yf_ticker.fast_info if hasattr(yf_ticker, "fast_info") else {}
+    last_price = info.get("last_price") or info.get("lastPrice")
+
+    return {
+        "ticker": ticker,
+        "as_of": datetime.utcnow().isoformat(),
+        "last_price": float(last_price) if last_price else None,
+        "daily_bars_last_30d": daily_rows,
+        "news": news,
+    }
+
+
+def rate_setup(ticker: str, setup: dict[str, Any]) -> dict[str, Any]:
+    """Quick Claude rating of a single scanner-detected setup.
+
+    Returns {"rating": int 1-10, "reason": str}. Falls back to {"rating": None,
+    "reason": <error>} if Claude returns malformed output.
+    """
+    ticker = ticker.upper()
+    context = _fetch_context_light(ticker)
+    context["setup"] = setup
+
+    user_msg = f"Rate this setup:\n```json\n{_compact_json(context)}\n```"
+    result = call_claude(
+        system=SETUP_RATER_SYSTEM,
+        user=user_msg,
+        cache_system=True,
+        json_response=True,
+        max_tokens=200,
+    )
+    if not isinstance(result, dict):
+        return {"rating": None, "reason": f"non-dict response: {result!r}"}
+    rating = result.get("rating")
+    try:
+        rating = int(rating) if rating is not None else None
+    except (TypeError, ValueError):
+        rating = None
+    return {"rating": rating, "reason": result.get("reason", "")}
 
 
 def _compact_json(obj: Any) -> str:

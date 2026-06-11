@@ -58,7 +58,10 @@
       <div class="border-t border-slate-800 mt-2">
         <div class="px-3 py-2 flex items-center justify-between">
           <span class="text-xs uppercase text-slate-500">Setups</span>
-          <button id="setups-refresh" class="text-xs text-cyan-400 hover:underline">scan</button>
+          <div class="flex gap-2">
+            <button id="setups-rate" class="text-xs text-amber-400 hover:underline" title="Send top setups to Claude for a 1-10 rating">rate</button>
+            <button id="setups-refresh" class="text-xs text-cyan-400 hover:underline">scan</button>
+          </div>
         </div>
         <ul id="setups-list" class="text-xs"></ul>
       </div>
