@@ -6,6 +6,12 @@
   <header class="border-b border-slate-800 px-4 py-2 flex items-center justify-between">
     <div class="flex items-center gap-4">
       <h1 class="text-lg font-bold text-cyan-400">Trading Assistant</h1>
+      <nav class="flex gap-3 text-xs text-slate-400">
+        <a href="/" class="hover:text-cyan-400 text-cyan-400">Dashboard</a>
+        <a href="/journal" class="hover:text-cyan-400">Journal</a>
+        <a href="/prep" class="hover:text-cyan-400">Prep</a>
+        <a href="/backtest" class="hover:text-cyan-400">Backtest</a>
+      </nav>
       <span id="ws-status" class="text-xs text-slate-500">connecting…</span>
     </div>
     <div class="flex items-center gap-2 text-sm">
@@ -20,8 +26,13 @@
       <span id="active-ticker" class="ml-4 font-bold text-lg">{{ default_ticker }}</span>
       <span id="active-quote" class="text-slate-400 text-sm">—</span>
       <button
+        id="analyze-btn"
+        class="ml-2 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-cyan-400 text-xs"
+        title="Claude analysis"
+      >Analyze</button>
+      <button
         id="settings-btn"
-        class="ml-4 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-slate-300"
+        class="ml-2 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-slate-300"
         title="Settings"
       >⚙</button>
     </div>
@@ -29,8 +40,8 @@
 
   <!-- Main 3-col layout -->
   <div class="flex-1 flex overflow-hidden">
-    <!-- Watchlist -->
-    <aside class="w-48 border-r border-slate-800 overflow-y-auto">
+    <!-- Watchlist + Setups -->
+    <aside class="w-56 border-r border-slate-800 overflow-y-auto flex flex-col">
       <div class="px-3 py-2 text-xs uppercase text-slate-500 border-b border-slate-800">Watchlist</div>
       <ul id="watchlist">
         {% for ticker in watchlist %}
@@ -43,6 +54,14 @@
           </li>
         {% endfor %}
       </ul>
+
+      <div class="border-t border-slate-800 mt-2">
+        <div class="px-3 py-2 flex items-center justify-between">
+          <span class="text-xs uppercase text-slate-500">Setups</span>
+          <button id="setups-refresh" class="text-xs text-cyan-400 hover:underline">scan</button>
+        </div>
+        <ul id="setups-list" class="text-xs"></ul>
+      </div>
     </aside>
 
     <!-- Chart -->
@@ -54,25 +73,33 @@
     <!-- Right rail -->
     <aside class="w-72 border-l border-slate-800 flex flex-col overflow-hidden">
       <div class="px-3 py-2 border-b border-slate-800">
-        <div class="text-xs uppercase text-slate-500 mb-1">Account</div>
+        <div class="text-xs uppercase text-slate-500 mb-1 flex justify-between">
+          <span>Account</span>
+          <span id="account-status" class="text-amber-400">—</span>
+        </div>
         <div class="text-sm space-y-0.5">
+          <div class="flex justify-between">
+            <span class="text-slate-400">Equity</span>
+            <span id="account-equity">—</span>
+          </div>
           <div class="flex justify-between">
             <span class="text-slate-400">Settled cash</span>
             <span id="settled-cash">—</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-slate-400">Unsettled</span>
-            <span id="unsettled-cash">—</span>
+            <span class="text-slate-400">Buying power</span>
+            <span id="buying-power">—</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-slate-400">Today P&amp;L</span>
+            <span class="text-slate-400">Day P&amp;L</span>
             <span id="day-pnl">—</span>
           </div>
         </div>
-        <div class="text-xs text-amber-400 mt-2" id="schwab-banner">
-          Schwab not connected — using yfinance + mock data.
-          Run <code class="bg-slate-800 px-1 rounded">trader auth login</code> after API approval.
-        </div>
+      </div>
+
+      <div class="px-3 py-2 border-b border-slate-800">
+        <div class="text-xs uppercase text-slate-500 mb-1">Positions</div>
+        <ul id="positions-list" class="text-xs space-y-1"><li class="text-slate-500">—</li></ul>
       </div>
 
       <div class="px-3 py-2 border-b border-slate-800 flex-1 overflow-y-auto">
@@ -81,13 +108,14 @@
       </div>
 
       <div class="px-3 py-2 border-t border-slate-800">
-        <button class="w-full bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded text-sm font-bold">
-          Place order (Phase 3)
+        <button id="order-btn" class="w-full bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded text-sm font-bold">
+          Place order
         </button>
       </div>
     </aside>
   </div>
 </div>
+
 <!-- Settings modal -->
 <div
   id="settings-modal"
@@ -276,17 +304,106 @@
     </div>
   </div>
 </div>
+
+<!-- Order ticket modal -->
+<div id="order-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-lg flex flex-col">
+    <div class="flex items-center justify-between border-b border-slate-700 px-4 py-3">
+      <h2 class="text-lg font-bold text-cyan-400">Place order</h2>
+      <button id="order-close" class="text-slate-400 hover:text-white text-2xl leading-none">×</button>
+    </div>
+    <div class="p-4 space-y-3 text-sm">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Ticker</label>
+          <input id="order-ticker" type="text" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 uppercase" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Side</label>
+          <select id="order-side" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1">
+            <option value="buy">buy</option>
+            <option value="sell">sell</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Entry</label>
+          <input id="order-entry" type="number" step="0.01" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Stop</label>
+          <input id="order-stop" type="number" step="0.01" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Target</label>
+          <input id="order-target" type="number" step="0.01" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1" />
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Risk %</label>
+          <input id="order-risk" type="number" step="0.1" placeholder="1.0" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Qty (override)</label>
+          <input id="order-qty" type="number" step="1" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Type</label>
+          <select id="order-type" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1">
+            <option value="limit">limit</option>
+            <option value="bracket">bracket</option>
+            <option value="market">market</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="order-preview" class="bg-slate-800/50 border border-slate-700 rounded p-3 text-xs space-y-1">
+        <div class="text-slate-500">Fill in entry + stop, then click Preview.</div>
+      </div>
+    </div>
+    <div class="border-t border-slate-700 px-4 py-3 flex justify-between items-center">
+      <span id="order-status" class="text-xs text-slate-500"></span>
+      <div class="flex gap-2">
+        <button id="order-preview-btn" class="px-3 py-1 text-sm rounded border border-slate-700 hover:bg-slate-800">Preview</button>
+        <button id="order-submit-btn" class="px-3 py-1 text-sm rounded bg-cyan-700 hover:bg-cyan-600 font-bold disabled:opacity-50" disabled>Submit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Analyze modal -->
+<div id="analyze-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-2xl max-h-[85vh] flex flex-col">
+    <div class="flex items-center justify-between border-b border-slate-700 px-4 py-3">
+      <h2 class="text-lg font-bold text-cyan-400">Claude analysis · <span id="analyze-ticker">—</span></h2>
+      <button id="analyze-close" class="text-slate-400 hover:text-white text-2xl leading-none">×</button>
+    </div>
+    <div id="analyze-body" class="flex-1 overflow-y-auto p-4 text-sm">
+      <div class="text-slate-500">Fetching thesis…</div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="/static/js/chart.js"></script>
 <script src="/static/js/ws.js"></script>
 <script src="/static/js/settings.js"></script>
+<script src="/static/js/account.js"></script>
+<script src="/static/js/orders.js"></script>
+<script src="/static/js/analyze.js"></script>
+<script src="/static/js/setups.js"></script>
 <script>
   initDashboard({
     defaultTicker: {{ default_ticker | tojson }},
     watchlist: {{ watchlist | tojson }},
   });
   initSettings();
+  initAccount();
+  initOrders();
+  initAnalyze();
+  initSetups();
 </script>
 {% endblock %}

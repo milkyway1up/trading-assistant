@@ -27,8 +27,17 @@ def create_app() -> FastAPI:
     templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
     # Routers
-    from trader.web.api import quotes, settings, setups, stream
+    from trader.web.api import (
+        account, analyze, backtest, journal, orders, prep,
+        quotes, settings, setups, stream,
+    )
 
+    app.include_router(account.router, prefix="/api")
+    app.include_router(analyze.router, prefix="/api")
+    app.include_router(backtest.router, prefix="/api")
+    app.include_router(journal.router, prefix="/api")
+    app.include_router(orders.router, prefix="/api")
+    app.include_router(prep.router, prefix="/api")
     app.include_router(quotes.router, prefix="/api")
     app.include_router(settings.router, prefix="/api")
     app.include_router(setups.router, prefix="/api")
@@ -45,6 +54,18 @@ def create_app() -> FastAPI:
                 "default_ticker": (cfg.watchlist or ["SPY"])[0],
             },
         )
+
+    @app.get("/journal", response_class=HTMLResponse)
+    async def journal_page(request: Request):
+        return templates.TemplateResponse(request, "journal.html", {})
+
+    @app.get("/prep", response_class=HTMLResponse)
+    async def prep_page(request: Request):
+        return templates.TemplateResponse(request, "prep.html", {})
+
+    @app.get("/backtest", response_class=HTMLResponse)
+    async def backtest_page(request: Request):
+        return templates.TemplateResponse(request, "backtest.html", {})
 
     @app.get("/healthz")
     async def healthz():

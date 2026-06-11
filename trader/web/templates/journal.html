@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Journal · Trading Assistant{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex flex-col">
+  <header class="border-b border-slate-800 px-4 py-2 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <h1 class="text-lg font-bold text-cyan-400">Trading Assistant</h1>
+      <nav class="flex gap-3 text-xs text-slate-400">
+        <a href="/" class="hover:text-cyan-400">Dashboard</a>
+        <a href="/journal" class="hover:text-cyan-400 text-cyan-400">Journal</a>
+        <a href="/prep" class="hover:text-cyan-400">Prep</a>
+        <a href="/backtest" class="hover:text-cyan-400">Backtest</a>
+      </nav>
+    </div>
+    <div class="flex items-center gap-2 text-sm">
+      <button id="journal-sync" class="px-3 py-1 rounded border border-slate-700 hover:bg-slate-800 text-cyan-400">Sync from broker</button>
+      <select id="journal-filter-setup" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs">
+        <option value="">all setups</option>
+        <option value="breakout">breakout</option>
+        <option value="flag">flag</option>
+        <option value="pullback">pullback</option>
+        <option value="earnings_runner">earnings_runner</option>
+        <option value="reversal">reversal</option>
+        <option value="relative_strength">relative_strength</option>
+      </select>
+      <label class="flex items-center gap-1 text-xs text-slate-400">
+        <input type="checkbox" id="journal-closed-only" /> closed only
+      </label>
+    </div>
+  </header>
+
+  <main class="flex-1 p-4 grid grid-cols-12 gap-4">
+    <section class="col-span-4 space-y-4">
+      <div class="bg-slate-800/30 border border-slate-700 rounded p-4">
+        <div class="text-xs uppercase text-slate-500 mb-2">Stats · last <span id="stats-window">30</span>d</div>
+        <div id="journal-stats" class="text-sm space-y-1">
+          <div class="text-slate-500">loading…</div>
+        </div>
+      </div>
+      <div class="bg-slate-800/30 border border-slate-700 rounded p-4">
+        <div class="text-xs uppercase text-slate-500 mb-2">Selected trade</div>
+        <div id="trade-detail" class="text-sm space-y-2">
+          <div class="text-slate-500">click a row to inspect.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="col-span-8 bg-slate-800/30 border border-slate-700 rounded overflow-hidden">
+      <table class="w-full text-xs">
+        <thead class="bg-slate-800 text-slate-400 text-left">
+          <tr>
+            <th class="px-3 py-2">id</th>
+            <th class="px-3 py-2">ticker</th>
+            <th class="px-3 py-2">side</th>
+            <th class="px-3 py-2">setup</th>
+            <th class="px-3 py-2">qty</th>
+            <th class="px-3 py-2">entry</th>
+            <th class="px-3 py-2">exit</th>
+            <th class="px-3 py-2">P&amp;L</th>
+            <th class="px-3 py-2">R</th>
+            <th class="px-3 py-2">grade</th>
+          </tr>
+        </thead>
+        <tbody id="trades-body">
+          <tr><td colspan="10" class="px-3 py-4 text-slate-500">loading…</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/journal.js"></script>
+<script>initJournal();</script>
+{% endblock %}

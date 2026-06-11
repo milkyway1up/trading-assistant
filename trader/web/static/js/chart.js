@@ -201,3 +201,6 @@ window.initDashboard = function (opts) {
   refreshWatchlistQuotes(opts.watchlist);
   setInterval(() => refreshWatchlistQuotes(opts.watchlist), 30_000);
 };
+
+window.loadTicker = (ticker) => loadTicker(ticker, activeTimeframe);
+window.getActiveTicker = () => activeTicker;
