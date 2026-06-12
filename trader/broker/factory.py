@@ -17,20 +17,35 @@ from trader.broker.base import BrokerClient, DataClient
 from trader.config import get_config, get_secrets
 
 
+def _alpaca_keys_for_mode(mode: str) -> tuple[str, str]:
+    """Return (api_key, secret_key) for the requested mode, falling back to the
+    legacy single-pair keys when the mode-specific keys are blank. Legacy keys
+    are treated as paper credentials, matching the historical default."""
+    secrets = get_secrets()
+    if mode == "live":
+        if secrets.alpaca_live_api_key and secrets.alpaca_live_secret_key:
+            return secrets.alpaca_live_api_key, secrets.alpaca_live_secret_key
+        return "", ""  # never silently fall back to paper keys for live
+    if secrets.alpaca_paper_api_key and secrets.alpaca_paper_secret_key:
+        return secrets.alpaca_paper_api_key, secrets.alpaca_paper_secret_key
+    return secrets.alpaca_api_key, secrets.alpaca_secret_key
+
+
 @lru_cache(maxsize=1)
 def get_broker() -> BrokerClient:
     cfg = get_config()
-    secrets = get_secrets()
     provider = cfg.broker.provider
 
     if provider == "alpaca":
         from trader.broker.alpaca import AlpacaBrokerClient
 
-        logger.debug("Constructing AlpacaBrokerClient (paper={})", cfg.broker.paper)
+        mode = cfg.broker.mode
+        api_key, secret = _alpaca_keys_for_mode(mode)
+        logger.debug("Constructing AlpacaBrokerClient (mode={})", mode)
         return AlpacaBrokerClient(
-            api_key=secrets.alpaca_api_key,
-            secret_key=secrets.alpaca_secret_key,
-            paper=cfg.broker.paper,
+            api_key=api_key,
+            secret_key=secret,
+            paper=(mode == "paper"),
         )
 
     if provider == "schwab":
@@ -44,16 +59,17 @@ def get_broker() -> BrokerClient:
 @lru_cache(maxsize=1)
 def get_data_client() -> DataClient:
     cfg = get_config()
-    secrets = get_secrets()
     provider = cfg.broker.provider
 
     if provider == "alpaca":
         from trader.data.alpaca_data import AlpacaDataClient
 
-        return AlpacaDataClient(
-            api_key=secrets.alpaca_api_key,
-            secret_key=secrets.alpaca_secret_key,
-        )
+        # Data API works for either key set — prefer paper since it's the safer
+        # default and most users will have those configured first.
+        api_key, secret = _alpaca_keys_for_mode("paper")
+        if not api_key:
+            api_key, secret = _alpaca_keys_for_mode(cfg.broker.mode)
+        return AlpacaDataClient(api_key=api_key, secret_key=secret)
 
     if provider == "schwab":
         from trader.data.schwab_rest import SchwabRestDataClient

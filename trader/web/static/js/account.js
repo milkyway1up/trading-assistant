@@ -14,6 +14,66 @@ function fmtSigned(n) {
   return `${sign}${fmtMoney(n)}`;
 }
 
+function applyAccountMode(mode) {
+  // mode: "paper" | "live" | null
+  const body = document.body;
+  const badge = document.getElementById("mode-badge");
+  if (mode === "live") {
+    body.dataset.tradingMode = "live";
+    if (badge) { badge.textContent = "● LIVE"; badge.title = "Live trading — real money. Click to switch."; }
+  } else if (mode === "paper") {
+    body.dataset.tradingMode = "paper";
+    if (badge) { badge.textContent = "● PAPER"; badge.title = "Paper trading — simulated. Click to switch."; }
+  } else {
+    delete body.dataset.tradingMode;
+    if (badge) { badge.textContent = "—"; badge.title = "No broker configured"; }
+  }
+}
+window.applyAccountMode = applyAccountMode;
+
+async function switchMode(mode) {
+  if (mode === "live") {
+    if (!confirm("Switch to LIVE trading?\n\nOrders submitted here will use real money.")) return;
+  }
+  try {
+    const res = await fetch("/api/settings/broker/switch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.detail || "switch failed");
+      return;
+    }
+    applyAccountMode(mode);
+    refreshAccount();
+  } catch (e) {
+    alert("switch failed: " + e.message);
+  }
+}
+
+function wireModeSwitcher() {
+  const badge = document.getElementById("mode-badge");
+  const dropdown = document.getElementById("mode-dropdown");
+  if (!badge || !dropdown) return;
+  badge.addEventListener("click", (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle("hidden");
+  });
+  document.addEventListener("click", (e) => {
+    if (!dropdown.classList.contains("hidden") && !dropdown.contains(e.target) && e.target !== badge) {
+      dropdown.classList.add("hidden");
+    }
+  });
+  dropdown.querySelectorAll("[data-switch-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      dropdown.classList.add("hidden");
+      switchMode(btn.dataset.switchMode);
+    });
+  });
+}
+
 async function refreshAccount() {
   let data;
   try {
@@ -22,8 +82,10 @@ async function refreshAccount() {
   } catch (e) {
     document.getElementById("account-status").textContent = "offline";
     document.getElementById("account-status").className = "text-red-400";
+    applyAccountMode(null);
     return;
   }
+  applyAccountMode(data.mode || null);
 
   const status = document.getElementById("account-status");
   if (!data.connected) {
@@ -80,6 +142,7 @@ async function refreshAccount() {
 }
 
 window.initAccount = function () {
+  wireModeSwitcher();
   refreshAccount();
   setInterval(refreshAccount, 10_000);
 };

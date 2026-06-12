@@ -31,6 +31,36 @@ function openOrderModal() {
   $("order-modal").classList.remove("hidden");
 }
 
+window.openOrderFromAnalysis = function (analysis) {
+  // analysis = { ticker, side, entry, stop, target, confidence, thesis, ... }
+  $("order-ticker").value = analysis.ticker || "";
+  $("order-side").value = analysis.side === "sell" ? "sell" : "buy";
+  $("order-entry").value = analysis.entry ?? "";
+  $("order-stop").value = analysis.stop ?? "";
+  $("order-target").value = analysis.target ?? "";
+  // Suggested-size override: if Claude sized below default risk, respect it.
+  $("order-risk").value = defaultRiskPct;
+  $("order-qty").value = "";
+  $("order-type").value = "bracket";
+
+  const conf = analysis.confidence != null ? `${analysis.confidence}/10` : "—";
+  const horizon = analysis.time_horizon_days != null
+    ? ` · ${analysis.time_horizon_days}d horizon`
+    : "";
+  const thesis = analysis.thesis ? `<div class="text-slate-400 text-xs mb-1">${analysis.thesis}</div>` : "";
+  $("order-preview").innerHTML = `
+    <div class="text-amber-400 font-bold mb-1">Claude Recommendation · ${conf}${horizon}</div>
+    ${thesis}
+    <div class="text-slate-500">Auto-previewing…</div>
+  `;
+  $("order-submit-btn").disabled = true;
+  $("order-status").textContent = "";
+  lastPreview = null;
+  $("order-modal").classList.remove("hidden");
+
+  setTimeout(() => previewOrder(), 100);
+};
+
 window.openOrderFromSetup = function (setup) {
   $("order-ticker").value = setup.ticker;
   $("order-side").value = (setup.side === "sell") ? "sell" : "buy";
@@ -133,8 +163,20 @@ async function previewOrder() {
 
 async function submitOrder() {
   if (!lastPreview || !lastPreview.ok) return;
-  if (!confirm("Place this order?")) return;
   const body = readOrderForm();
+  const isLive = document.body.dataset.tradingMode === "live";
+  if (isLive) {
+    const ok = confirm(
+      `⚠️ LIVE TRADING — REAL MONEY ⚠️\n\n` +
+      `${(body.side || "").toUpperCase()} ${lastPreview.qty || "?"} ${body.ticker} @ ${body.entry ?? "?"}\n` +
+      `Stop ${body.stop ?? "?"} · Target ${body.target ?? "?"}\n` +
+      `Dollar risk: $${(lastPreview.dollar_risk || 0).toFixed(2)}\n\n` +
+      `Place this order?`
+    );
+    if (!ok) return;
+  } else if (!confirm("Place this order?")) {
+    return;
+  }
   $("order-status").textContent = "submitting…";
   $("order-submit-btn").disabled = true;
   try {

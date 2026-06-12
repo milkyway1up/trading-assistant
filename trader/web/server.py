@@ -29,7 +29,7 @@ def create_app() -> FastAPI:
     # Routers
     from trader.web.api import (
         account, analyze, backtest, journal, orders, prep,
-        quotes, settings, setups, stream, trending,
+        quotes, recommend, settings, setups, stream, trending,
     )
 
     app.include_router(account.router, prefix="/api")
@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
     app.include_router(orders.router, prefix="/api")
     app.include_router(prep.router, prefix="/api")
     app.include_router(quotes.router, prefix="/api")
+    app.include_router(recommend.router, prefix="/api")
     app.include_router(settings.router, prefix="/api")
     app.include_router(setups.router, prefix="/api")
     app.include_router(trending.router, prefix="/api")

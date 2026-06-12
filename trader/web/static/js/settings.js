@@ -52,8 +52,13 @@ async function loadSettings() {
   document.querySelectorAll('[data-broker="provider"]').forEach((el) => {
     el.checked = el.value === (broker.provider || "alpaca");
   });
+  const mode = broker.mode || (broker.paper ? "paper" : "live");
+  document.querySelectorAll('[data-broker="mode"]').forEach((el) => {
+    el.checked = el.value === mode;
+  });
+  // Legacy single-checkbox for backwards-compat panels
   const paperEl = document.querySelector('[data-broker="paper"]');
-  if (paperEl) paperEl.checked = !!broker.paper;
+  if (paperEl) paperEl.checked = mode === "paper";
 }
 
 function readSecretsForm() {
@@ -96,10 +101,18 @@ function readConfigForm() {
 
   // Broker
   const provider = document.querySelector('[data-broker="provider"]:checked')?.value;
-  const paper = document.querySelector('[data-broker="paper"]')?.checked;
+  const modeRadio = document.querySelector('[data-broker="mode"]:checked')?.value;
+  const paperFallback = document.querySelector('[data-broker="paper"]')?.checked;
+  const mode = modeRadio || (paperFallback ? "paper" : (paperFallback === false ? "live" : null));
   const initialBroker = _initialConfig?.broker || {};
-  if (provider && (provider !== initialBroker.provider || paper !== !!initialBroker.paper)) {
-    out.broker = { ...initialBroker, provider, paper: !!paper };
+  const initialMode = initialBroker.mode || (initialBroker.paper ? "paper" : "live");
+  if (provider && (provider !== initialBroker.provider || (mode && mode !== initialMode))) {
+    out.broker = {
+      ...initialBroker,
+      provider,
+      mode: mode || initialMode,
+      paper: (mode || initialMode) === "paper",
+    };
   }
 
   return out;

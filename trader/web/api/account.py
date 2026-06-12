@@ -22,6 +22,11 @@ async def get_account() -> dict:
 
 
 def _get_account_sync() -> dict:
+    from trader.config import get_config
+
+    cfg = get_config()
+    mode = cfg.broker.mode
+
     try:
         from trader.broker.factory import get_broker
         broker = get_broker()
@@ -31,6 +36,7 @@ def _get_account_sync() -> dict:
             "error": str(e),
             "account": None,
             "positions": [],
+            "mode": mode,
         }
 
     try:
@@ -42,6 +48,7 @@ def _get_account_sync() -> dict:
             "error": f"Account fetch failed: {e}",
             "account": None,
             "positions": [],
+            "mode": mode,
         }
 
     try:
@@ -58,4 +65,5 @@ def _get_account_sync() -> dict:
         "account": account,
         "positions": positions,
         "day_pl": round(day_pl, 2),
+        "mode": mode,
     }

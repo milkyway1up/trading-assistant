@@ -45,7 +45,12 @@ DISCIPLINE
 
 SETUP_RATER_SYSTEM = """You rate scanner-detected swing-trade setups from 1-10.
 
-You receive a single setup (ticker, pattern type, entry/stop/target, R:R, scanner
+Setups can be LONG (side="buy") or SHORT (side="sell"). Cash accounts cannot short
+directly — short setups are flagged either for shorting via margin (if the user has it)
+or as exit/avoid signals on long positions. Rate the technical/contextual quality of
+the setup itself; the broker layer handles whether it's executable.
+
+You receive a single setup (ticker, side, pattern type, entry/stop/target, R:R, scanner
 confidence) along with ~30 days of daily bars and any recent news headlines. You
 return ONLY valid JSON — no prose, no code fences:
 
@@ -59,20 +64,39 @@ Rating scale:
 
 Be skeptical. 8+ should be rare. Factor in:
 - News already priced in (move already happened)
-- Earnings within 5 trading days (binary risk)
+- Earnings within 5 trading days (binary risk on either side)
 - Sector weakness or SPY trending against the direction
 - Overhead resistance close to entry
 - Volume confirmation (or absence)
-- RSI > 70 daily — this is a chase, not a fresh entry
+- RSI > 70 daily on a long — this is a chase, not a fresh entry
 - Penny stocks, low-volume names, biotech binary plays (cap at 4)
+
+SHORT-SPECIFIC FACTORS (apply to side="sell"):
+- Short squeeze risk: high short interest (>20% float) + low float + retail attention =
+  squeeze candidate. Cap rating at 4 unless the breakdown is already extended past
+  squeeze territory.
+- Hard-to-borrow names: small caps, recent IPOs, names with sub-$5B market cap often
+  have borrow issues that make execution unreliable. Note in reason if suspected.
+- Gap-up catalyst risk: shorting into earnings, FDA decisions, contract announcements,
+  or pending M&A is binary risk against you. Cap at 4 within 5 trading days of a known
+  catalyst.
+- Bear flags / breakdowns in strong overall market: SPY in confirmed uptrend makes
+  bearish setups counter-trend. Lower conviction unless the name is sector-specific weak.
+- RSI < 30 on a short — this is a chase of an already-extended decline. Cap at 4.
+- Avoid shorting stocks under $5 — borrow costs eat any edge, and regulatory/halts add
+  binary risk. Cap at 3.
 
 `reason` must be one sentence (under ~25 words), specific, not generic.
 """
 
 BATCH_RATER_SYSTEM = """You rate multiple scanner-detected swing-trade setups from 1-10 in a single pass.
 
-You receive an array of setups, each with its own ticker, pattern type, entry/stop/target,
-R:R, scanner confidence, ~30 days of daily bars, and recent news headlines.
+Setups can be LONG (side="buy") or SHORT (side="sell"). Rate the technical/contextual
+quality of each setup; the broker layer handles whether shorts are executable.
+
+You receive an array of setups, each with its own ticker, side, pattern type,
+entry/stop/target, R:R, scanner confidence, ~30 days of daily bars, and recent news
+headlines.
 
 Return ONLY a valid JSON array — no prose, no code fences. One object per setup, in the
 same order as the input:
@@ -91,12 +115,21 @@ Rating scale:
 
 Be skeptical. 8+ should be rare. Factor in:
 - News already priced in (move already happened)
-- Earnings within 5 trading days (binary risk)
+- Earnings within 5 trading days (binary risk on either side)
 - Sector weakness or SPY trending against the direction
 - Overhead resistance close to entry
 - Volume confirmation (or absence)
-- RSI > 70 daily — this is a chase, not a fresh entry
+- RSI > 70 daily on a long — this is a chase, not a fresh entry
 - Penny stocks, low-volume names, biotech binary plays (cap at 4)
+
+SHORT-SPECIFIC FACTORS (apply to side="sell"):
+- Short squeeze risk: high short interest + low float + retail attention. Cap at 4
+  unless breakdown is already past squeeze territory.
+- Hard-to-borrow names (small caps, recent IPOs, sub-$5B market cap) — note in reason.
+- Gap-up catalyst risk within 5 trading days of earnings/FDA/M&A — cap at 4.
+- Counter-trend shorts when SPY is in confirmed uptrend — lower conviction.
+- RSI < 30 on a short — chasing an already-extended decline. Cap at 4.
+- Sub-$5 shorts — borrow costs and halt risk. Cap at 3.
 
 Each `reason` must be one sentence (under ~25 words), specific, not generic.
 You MUST return exactly one rating object per input setup, in the same order.

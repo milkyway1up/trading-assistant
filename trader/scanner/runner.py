@@ -8,16 +8,32 @@ from loguru import logger
 
 from trader.data.yfinance_bars import get_bars as yf_get_bars
 from trader.scanner.universe import universe_with_watchlist
-from trader.setups import breakout, earnings_runner, flag, pullback, relative_strength, reversal
+from trader.setups import (
+    bear_flag,
+    breakdown,
+    breakout,
+    earnings_runner,
+    flag,
+    overbought_reversal,
+    pullback,
+    relative_strength,
+    relative_weakness,
+    reversal,
+)
 
 SetupFn = Callable[[pd.DataFrame], Optional[dict]]
 
 _DEFAULT_SETUPS: list[tuple[str, SetupFn]] = [
+    # Long setups
     ("breakout", breakout.detect),
     ("flag", flag.detect),
     ("pullback", pullback.detect),
     ("earnings_runner", earnings_runner.detect),
     ("reversal", reversal.detect),
+    # Short setups
+    ("breakdown", breakdown.detect),
+    ("bear_flag", bear_flag.detect),
+    ("overbought_reversal", overbought_reversal.detect),
 ]
 
 
@@ -71,6 +87,14 @@ def scan_ticker(ticker: str, df: pd.DataFrame,
                 rs["ticker"] = ticker
                 rs.setdefault("setup", "relative_strength")
                 out.append(rs)
+        except Exception:
+            pass
+        try:
+            rw = relative_weakness.detect(df, spy_df)
+            if rw:
+                rw["ticker"] = ticker
+                rw.setdefault("setup", "relative_weakness")
+                out.append(rw)
         except Exception:
             pass
     return out

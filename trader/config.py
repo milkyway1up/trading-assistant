@@ -24,6 +24,15 @@ class Secrets(BaseSettings):
     schwab_app_key: str = ""
     schwab_app_secret: str = ""
     schwab_callback_url: str = "https://127.0.0.1:8182"
+    # Paper-trading API keys (Alpaca paper endpoint).
+    alpaca_paper_api_key: str = ""
+    alpaca_paper_secret_key: str = ""
+    # Live-trading API keys (real money).
+    alpaca_live_api_key: str = ""
+    alpaca_live_secret_key: str = ""
+    # Legacy single-pair keys, retained for migration. If the paper keys are
+    # blank but these are populated, the factory will fall back to them and
+    # treat them as paper credentials (the historical default).
     alpaca_api_key: str = ""
     alpaca_secret_key: str = ""
     slack_webhook_url: str = ""
@@ -47,9 +56,23 @@ class BrokerConfig(BaseModel):
 
     `alpaca` works the moment you paste API keys (paper trading is instant).
     `schwab` requires the developer.schwab.com app approval (1–3 business days).
+
+    `mode` is the source of truth (paper vs live). The legacy `paper` boolean
+    is preserved for older config.yaml files; on read we coerce it into `mode`.
     """
     provider: Literal["schwab", "alpaca"] = "alpaca"
-    paper: bool = True  # Alpaca: route to paper-trading endpoint
+    mode: Literal["paper", "live"] = "paper"
+    paper: bool = True  # legacy; kept in sync with `mode` for old consumers
+
+    def model_post_init(self, __ctx) -> None:  # type: ignore[override]
+        # Reconcile legacy `paper` with `mode`. If one is set explicitly and
+        # the other was left at default, mirror the explicit one.
+        if self.mode == "paper" and self.paper is False:
+            object.__setattr__(self, "mode", "live")
+        elif self.mode == "live" and self.paper is True:
+            object.__setattr__(self, "paper", False)
+        else:
+            object.__setattr__(self, "paper", self.mode == "paper")
 
 
 class AlertRule(BaseModel):
@@ -140,7 +163,10 @@ CONFIG_PATH = PROJECT_ROOT / "config.yaml"
 ENV_PATH = PROJECT_ROOT / ".env"
 _ENV_KEYS = {
     "anthropic_api_key", "schwab_app_key", "schwab_app_secret",
-    "schwab_callback_url", "alpaca_api_key", "alpaca_secret_key",
+    "schwab_callback_url",
+    "alpaca_paper_api_key", "alpaca_paper_secret_key",
+    "alpaca_live_api_key", "alpaca_live_secret_key",
+    "alpaca_api_key", "alpaca_secret_key",  # legacy
     "slack_webhook_url",
 }
 

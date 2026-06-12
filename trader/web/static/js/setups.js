@@ -19,6 +19,10 @@ function renderSetupRow(s, i) {
   const rr = s.risk_reward != null ? `${s.risk_reward.toFixed(1)}R` : "";
   const reason = escapeAttr(s.reason || "");
   const setupName = s.setup || s.setup_type || "";
+  const isShort = s.side === "sell" || s.side === "short";
+  const sideBadge = isShort
+    ? `<span class="text-[10px] px-1 py-0.5 rounded bg-rose-900/60 text-rose-300 font-semibold uppercase">short</span>`
+    : `<span class="text-[10px] px-1 py-0.5 rounded bg-emerald-900/60 text-emerald-300 font-semibold uppercase">long</span>`;
   const ratingBadge = s.claude_rating != null
     ? `<span class="claude-badge ${ratingColor(s.claude_rating)} font-bold" title="${escapeAttr(s.claude_reason || "")}">${s.claude_rating}/10</span>`
     : "";
@@ -28,7 +32,10 @@ function renderSetupRow(s, i) {
         data-setup-ticker="${escapeAttr(s.ticker)}"
         title="${reason}">
       <div class="flex justify-between items-center">
-        <span class="font-bold">${s.ticker}</span>
+        <span class="flex items-center gap-1.5">
+          <span class="font-bold">${s.ticker}</span>
+          ${sideBadge}
+        </span>
         <span class="flex items-center gap-2">
           ${ratingBadge}
           <span class="text-cyan-400">${conf}</span>

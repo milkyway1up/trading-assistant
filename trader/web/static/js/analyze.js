@@ -1,11 +1,15 @@
 // analyze.js — Claude analysis modal.
 
+let lastAnalysis = null;
+let lastAnalyzedTicker = null;
+
 function renderThesis(body, data) {
   if (data.error) {
     body.innerHTML = `<div class="text-red-400">${data.error}</div>`;
     return;
   }
   const r = data.result || data;
+  lastAnalysis = r;
   const lvls = (r.key_levels || []).map((l) => `<li>${typeof l === "object" ? `${l.label || ""} <span class="text-slate-400">${l.price ?? ""}</span>` : l}</li>`).join("");
   const cats = (r.catalysts || []).map((c) => `<li>${c}</li>`).join("");
   const risks = (r.risks || []).map((c) => `<li>${c}</li>`).join("");
@@ -37,14 +41,52 @@ function renderThesis(body, data) {
       ${cats ? `<div><div class="text-xs uppercase text-slate-500">Catalysts</div><ul class="list-disc list-inside mt-1 space-y-0.5">${cats}</ul></div>` : ""}
       ${lvls ? `<div><div class="text-xs uppercase text-slate-500">Key levels</div><ul class="list-disc list-inside mt-1 space-y-0.5">${lvls}</ul></div>` : ""}
       ${risks ? `<div><div class="text-xs uppercase text-slate-500">Risks</div><ul class="list-disc list-inside mt-1 space-y-0.5 text-amber-300">${risks}</ul></div>` : ""}
+      <div class="pt-2 border-t border-slate-800">
+        <button id="analyze-trade-btn"
+          class="px-3 py-1 rounded bg-amber-500 text-black text-sm font-bold hover:bg-amber-400 disabled:opacity-50"
+          ${(r.ideal_entry == null && r.entry_zone == null) ? "disabled title='No entry level returned'" : ""}
+        >Trade This →</button>
+      </div>
     </div>
   `;
+  const tradeBtn = document.getElementById("analyze-trade-btn");
+  if (tradeBtn) {
+    tradeBtn.addEventListener("click", () => openOrderFromAnalysisResult(r));
+  }
+}
+
+function openOrderFromAnalysisResult(r) {
+  if (!window.openOrderFromAnalysis) return;
+  let entry = r.ideal_entry;
+  if (entry == null && r.entry_zone != null) {
+    if (typeof r.entry_zone === "number") {
+      entry = r.entry_zone;
+    } else if (typeof r.entry_zone === "string") {
+      const parts = r.entry_zone.replace(/\$/g, "").replace(/,/g, "").split(/[-–—]/);
+      const nums = parts.map(p => parseFloat(p)).filter(n => !isNaN(n));
+      if (nums.length) entry = nums.reduce((a, b) => a + b, 0) / nums.length;
+    }
+  }
+  const bias = (r.bias || r.trend || "").toLowerCase();
+  const side = bias.includes("down") || bias.includes("bear") || bias.includes("short") ? "sell" : "buy";
+  window.openOrderFromAnalysis({
+    ticker: lastAnalyzedTicker || r.ticker,
+    side,
+    entry,
+    stop: r.stop ?? r.stop_level,
+    target: r.target,
+    confidence: r.confidence,
+    thesis: r.thesis,
+    time_horizon_days: r.time_horizon_days,
+  });
 }
 
 async function runAnalyze(ticker) {
   const body = document.getElementById("analyze-body");
   document.getElementById("analyze-ticker").textContent = ticker;
   document.getElementById("analyze-modal").classList.remove("hidden");
+  lastAnalyzedTicker = ticker;
+  lastAnalysis = null;
   body.innerHTML = `<div class="text-slate-500">Asking Claude about ${ticker}… (this can take 20–40s)</div>`;
   try {
     const res = await fetch(`/api/analyze/${encodeURIComponent(ticker)}`, { method: "POST" });

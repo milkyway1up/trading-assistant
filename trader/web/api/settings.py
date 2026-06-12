@@ -19,6 +19,11 @@ class SecretsView(BaseModel):
     schwab_app_key_set: bool
     schwab_app_secret_set: bool
     schwab_callback_url: str  # not really a secret; safe to round-trip
+    alpaca_paper_api_key_set: bool
+    alpaca_paper_secret_key_set: bool
+    alpaca_live_api_key_set: bool
+    alpaca_live_secret_key_set: bool
+    # Legacy fields retained so the UI can prompt to migrate.
     alpaca_api_key_set: bool
     alpaca_secret_key_set: bool
     slack_webhook_url_set: bool
@@ -30,6 +35,10 @@ class SecretsUpdate(BaseModel):
     schwab_app_key: str | None = None
     schwab_app_secret: str | None = None
     schwab_callback_url: str | None = None
+    alpaca_paper_api_key: str | None = None
+    alpaca_paper_secret_key: str | None = None
+    alpaca_live_api_key: str | None = None
+    alpaca_live_secret_key: str | None = None
     alpaca_api_key: str | None = None
     alpaca_secret_key: str | None = None
     slack_webhook_url: str | None = None
@@ -44,6 +53,10 @@ async def get_settings() -> dict[str, Any]:
             schwab_app_key_set=bool(s.schwab_app_key),
             schwab_app_secret_set=bool(s.schwab_app_secret),
             schwab_callback_url=s.schwab_callback_url,
+            alpaca_paper_api_key_set=bool(s.alpaca_paper_api_key),
+            alpaca_paper_secret_key_set=bool(s.alpaca_paper_secret_key),
+            alpaca_live_api_key_set=bool(s.alpaca_live_api_key),
+            alpaca_live_secret_key_set=bool(s.alpaca_live_secret_key),
             alpaca_api_key_set=bool(s.alpaca_api_key),
             alpaca_secret_key_set=bool(s.alpaca_secret_key),
             slack_webhook_url_set=bool(s.slack_webhook_url),
@@ -104,6 +117,54 @@ async def update_config(body: ConfigUpdate) -> dict[str, Any]:
             pass
 
     return {"status": "ok", "config": new_cfg.model_dump()}
+
+
+class BrokerSwitchBody(BaseModel):
+    mode: str  # "paper" or "live"
+
+
+@router.post("/broker/switch")
+async def broker_switch(body: BrokerSwitchBody) -> dict[str, Any]:
+    """Flip the broker between paper and live, validating that live keys exist
+    before allowing the switch. Resets the cached broker client so the next
+    request lands on the new account."""
+    mode = (body.mode or "").lower().strip()
+    if mode not in ("paper", "live"):
+        raise HTTPException(status_code=400, detail="mode must be 'paper' or 'live'")
+
+    s = get_secrets()
+    if mode == "live" and not (s.alpaca_live_api_key and s.alpaca_live_secret_key):
+        raise HTTPException(
+            status_code=400,
+            detail="Live API keys not configured. Add them in Settings → API Keys.",
+        )
+    if mode == "paper" and not (
+        (s.alpaca_paper_api_key and s.alpaca_paper_secret_key)
+        or (s.alpaca_api_key and s.alpaca_secret_key)
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Paper API keys not configured. Add them in Settings → API Keys.",
+        )
+
+    cfg = get_config()
+    broker_update = {
+        "provider": cfg.broker.provider,
+        "mode": mode,
+        "paper": (mode == "paper"),
+    }
+    try:
+        save_config({"broker": broker_update})
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors())
+
+    try:
+        from trader.broker.factory import reset_clients
+        reset_clients()
+    except Exception:
+        pass
+
+    return {"status": "ok", "mode": mode}
 
 
 class WatchlistAddBody(BaseModel):

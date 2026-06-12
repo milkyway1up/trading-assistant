@@ -13,6 +13,30 @@
         <a href="/backtest" class="hover:text-cyan-400">Backtest</a>
       </nav>
       <span id="ws-status" class="text-xs text-slate-500 hidden sm:inline">connecting…</span>
+      <div class="relative" id="account-switcher">
+        <button id="mode-badge"
+          class="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 cursor-pointer hover:bg-slate-700"
+          title="Click to switch trading mode">—</button>
+        <div id="mode-dropdown"
+          class="hidden absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded shadow-lg z-50 text-xs w-44">
+          <button data-switch-mode="paper"
+            class="w-full text-left px-3 py-2 hover:bg-slate-700 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-green-400"></span>
+            <div class="flex flex-col">
+              <span class="font-bold">Paper Trading</span>
+              <span class="text-[10px] text-slate-500">Simulated money</span>
+            </div>
+          </button>
+          <button data-switch-mode="live"
+            class="w-full text-left px-3 py-2 hover:bg-slate-700 flex items-center gap-2 border-t border-slate-700">
+            <span class="w-2 h-2 rounded-full bg-red-400"></span>
+            <div class="flex flex-col">
+              <span class="font-bold">Live Trading</span>
+              <span class="text-[10px] text-slate-500">Real money</span>
+            </div>
+          </button>
+        </div>
+      </div>
     </div>
     <div class="flex items-center gap-1.5 text-sm min-w-0 shrink">
       <div class="flex gap-0.5" id="timeframe-buttons">
@@ -30,6 +54,16 @@
         class="px-1.5 py-0.5 rounded border border-slate-700 hover:bg-slate-800 text-cyan-400 text-xs whitespace-nowrap"
         title="Claude analysis"
       >Analyze</button>
+      <button
+        id="recommend-btn"
+        class="px-1.5 py-0.5 rounded border border-slate-700 hover:bg-slate-800 text-amber-400 text-xs whitespace-nowrap"
+        title="Claude analyzes ticker and pre-fills order ticket"
+      >Recommend</button>
+      <button
+        id="toggle-ichimoku"
+        class="px-1.5 py-0.5 rounded border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs whitespace-nowrap"
+        title="Toggle Ichimoku Cloud"
+      >Cloud</button>
       <button
         id="settings-btn"
         class="px-1.5 py-0.5 rounded border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs"
@@ -186,27 +220,62 @@
         </div>
 
         <div class="border-t border-slate-700 pt-3 mt-2">
-          <div class="text-xs text-slate-400 mb-2 uppercase tracking-wide">Alpaca (default broker)</div>
-          <p class="text-xs text-slate-500 mb-2">Instant signup at <a href="https://alpaca.markets" target="_blank" class="text-cyan-400 underline">alpaca.markets</a> → Paper Trading → API Keys. No approval wait.</p>
+          <div class="text-xs uppercase tracking-wide mb-2">
+            <span class="text-green-400 font-bold">● Alpaca Paper Account</span>
+          </div>
+          <p class="text-xs text-slate-500 mb-2">
+            <a href="https://alpaca.markets" target="_blank" class="text-cyan-400 underline">alpaca.markets</a>
+            → Paper Trading → API Keys. Simulated money, instant.
+          </p>
         </div>
 
         <div>
-          <label class="block text-xs text-slate-400 mb-1">Alpaca API Key</label>
+          <label class="block text-xs text-slate-400 mb-1">Paper API Key</label>
           <div class="flex gap-2">
-            <input data-secret="alpaca_api_key" type="password" placeholder="PK… (paper) or AK… (live)"
+            <input data-secret="alpaca_paper_api_key" type="password" placeholder="PK…"
               class="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm" />
-            <span data-secret-status="alpaca_api_key_set" class="text-xs self-center w-16 text-slate-500">—</span>
+            <span data-secret-status="alpaca_paper_api_key_set" class="text-xs self-center w-16 text-slate-500">—</span>
           </div>
         </div>
 
         <div>
-          <label class="block text-xs text-slate-400 mb-1">Alpaca Secret Key</label>
+          <label class="block text-xs text-slate-400 mb-1">Paper Secret Key</label>
           <div class="flex gap-2">
-            <input data-secret="alpaca_secret_key" type="password" placeholder="alpaca secret"
+            <input data-secret="alpaca_paper_secret_key" type="password" placeholder="paper secret"
               class="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm" />
-            <span data-secret-status="alpaca_secret_key_set" class="text-xs self-center w-16 text-slate-500">—</span>
+            <span data-secret-status="alpaca_paper_secret_key_set" class="text-xs self-center w-16 text-slate-500">—</span>
           </div>
-          <p class="text-xs text-slate-500 mt-1">Switch to live trading by setting <code>broker.paper: false</code> in <code>config.yaml</code> and pasting live keys.</p>
+        </div>
+
+        <div class="border-t border-slate-700 pt-3 mt-2">
+          <div class="text-xs uppercase tracking-wide mb-2">
+            <span class="text-red-400 font-bold">● Alpaca Live Account</span>
+          </div>
+          <p class="text-xs text-slate-500 mb-2">
+            Live Trading → API Keys. Real money. Account must be KYC-approved
+            (1–2 business days if not already verified).
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Live API Key</label>
+          <div class="flex gap-2">
+            <input data-secret="alpaca_live_api_key" type="password" placeholder="AK…"
+              class="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm" />
+            <span data-secret-status="alpaca_live_api_key_set" class="text-xs self-center w-16 text-slate-500">—</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Live Secret Key</label>
+          <div class="flex gap-2">
+            <input data-secret="alpaca_live_secret_key" type="password" placeholder="live secret"
+              class="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm" />
+            <span data-secret-status="alpaca_live_secret_key_set" class="text-xs self-center w-16 text-slate-500">—</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">
+            Switch between paper and live from the mode badge in the top bar — no restart needed.
+          </p>
         </div>
 
         <div class="border-t border-slate-700 pt-3 mt-2">
@@ -277,13 +346,26 @@
         </div>
 
         <div class="border-t border-slate-700 pt-3">
-          <label class="flex items-start gap-2 cursor-pointer">
-            <input type="checkbox" data-broker="paper" class="mt-1" />
-            <div>
-              <div class="text-sm font-bold">Paper trading <span class="text-xs text-slate-500">(Alpaca only)</span></div>
-              <div class="text-xs text-slate-500">Routes orders to Alpaca's paper endpoint. Uncheck to go live — make sure the keys you've pasted are live keys, not paper.</div>
-            </div>
-          </label>
+          <div class="text-xs text-slate-400 mb-2 uppercase tracking-wide">Trading mode <span class="normal-case text-slate-500">(Alpaca)</span></div>
+          <div class="flex gap-2">
+            <label class="flex-1 flex items-start gap-2 cursor-pointer px-3 py-2 rounded border-2 border-slate-700 hover:border-green-700">
+              <input type="radio" name="broker_mode" data-broker="mode" value="paper" class="mt-1" />
+              <div>
+                <div class="text-sm font-bold text-green-400">Paper</div>
+                <div class="text-xs text-slate-500">Simulated money, no risk</div>
+              </div>
+            </label>
+            <label class="flex-1 flex items-start gap-2 cursor-pointer px-3 py-2 rounded border-2 border-slate-700 hover:border-red-700">
+              <input type="radio" name="broker_mode" data-broker="mode" value="live" class="mt-1" />
+              <div>
+                <div class="text-sm font-bold text-red-400">Live</div>
+                <div class="text-xs text-slate-500">Real money</div>
+              </div>
+            </label>
+          </div>
+          <p class="text-xs text-slate-500 mt-2">
+            Make sure the matching keys are filled in on the API Keys tab — paper and live use different credentials.
+          </p>
         </div>
       </section>
 
@@ -424,6 +506,7 @@
 <script src="/static/js/account.js"></script>
 <script src="/static/js/orders.js"></script>
 <script src="/static/js/analyze.js"></script>
+<script src="/static/js/recommend.js"></script>
 <script src="/static/js/setups.js"></script>
 <script src="/static/js/trending.js"></script>
 <script>
@@ -435,6 +518,7 @@
   initAccount();
   initOrders();
   initAnalyze();
+  initRecommend();
   initSetups();
   initTrending();
 
