@@ -45,19 +45,24 @@ def call_claude(
 
     cfg = get_config()
 
+    import tempfile
+
+    # Write prompts to temp files to avoid Windows 32k command-line limit.
+    sys_file = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".txt", delete=False, encoding="utf-8",
+    )
+    sys_file.write(system)
+    sys_file.close()
+
     cmd = [
         "claude",
-        "-p", user,
-        "--append-system-prompt", system,
+        "-p", "-",
+        "--append-system-prompt-file", sys_file.name,
         "--output-format", "json",
         "--model", cfg.llm.model,
-        # Single-turn: don't let Claude Code try to invoke its tools (Read,
-        # Bash, etc.). All the data Claude needs is inline in `user`.
         "--max-turns", "1",
     ]
 
-    # Run in a clean env that strips any corporate ANTHROPIC_* overrides,
-    # in case the parent shell still has them set.
     env = {k: v for k, v in os.environ.items()
            if k not in {"ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN"}}
 
@@ -65,11 +70,16 @@ def call_claude(
 
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True,
+            cmd, input=user, capture_output=True, text=True,
             timeout=120, check=False, env=env,
         )
     except subprocess.TimeoutExpired as e:
         raise RuntimeError("claude CLI timed out after 120s") from e
+    finally:
+        try:
+            os.unlink(sys_file.name)
+        except OSError:
+            pass
 
     # The CLI emits structured JSON even on API errors and exits non-zero,
     # so prefer parsing stdout over trusting the exit code.

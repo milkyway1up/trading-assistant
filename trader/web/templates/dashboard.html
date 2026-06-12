@@ -3,36 +3,36 @@
 {% block content %}
 <div class="h-screen flex flex-col">
   <!-- Top bar -->
-  <header class="border-b border-slate-800 px-4 py-2 flex items-center justify-between">
-    <div class="flex items-center gap-4">
-      <h1 class="text-lg font-bold text-cyan-400">Trading Assistant</h1>
-      <nav class="flex gap-3 text-xs text-slate-400">
+  <header class="border-b border-slate-800 px-3 py-1.5 flex items-center justify-between gap-2 shrink-0 min-w-0 flex-wrap">
+    <div class="flex items-center gap-3 min-w-0 shrink">
+      <h1 class="text-sm font-bold text-cyan-400 whitespace-nowrap">Trading Assistant</h1>
+      <nav class="flex gap-2 text-xs text-slate-400 whitespace-nowrap">
         <a href="/" class="hover:text-cyan-400 text-cyan-400">Dashboard</a>
         <a href="/journal" class="hover:text-cyan-400">Journal</a>
         <a href="/prep" class="hover:text-cyan-400">Prep</a>
         <a href="/backtest" class="hover:text-cyan-400">Backtest</a>
       </nav>
-      <span id="ws-status" class="text-xs text-slate-500">connecting…</span>
+      <span id="ws-status" class="text-xs text-slate-500 hidden sm:inline">connecting…</span>
     </div>
-    <div class="flex items-center gap-2 text-sm">
-      <div class="flex gap-1" id="timeframe-buttons">
+    <div class="flex items-center gap-1.5 text-sm min-w-0 shrink">
+      <div class="flex gap-0.5" id="timeframe-buttons">
         {% for tf in ["15m", "1h", "4h", "1d"] %}
           <button
             data-tf="{{ tf }}"
-            class="tf-btn px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 {% if tf == '1d' %}bg-slate-800 border-cyan-500{% endif %}"
+            class="tf-btn px-1.5 py-0.5 rounded border border-slate-700 hover:bg-slate-800 text-xs {% if tf == '1d' %}bg-slate-800 border-cyan-500{% endif %}"
           >{{ tf }}</button>
         {% endfor %}
       </div>
-      <span id="active-ticker" class="ml-4 font-bold text-lg">{{ default_ticker }}</span>
-      <span id="active-quote" class="text-slate-400 text-sm">—</span>
+      <span id="active-ticker" class="ml-2 font-bold text-sm">{{ default_ticker }}</span>
+      <span id="active-quote" class="text-slate-400 text-xs truncate max-w-[120px]">—</span>
       <button
         id="analyze-btn"
-        class="ml-2 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-cyan-400 text-xs"
+        class="px-1.5 py-0.5 rounded border border-slate-700 hover:bg-slate-800 text-cyan-400 text-xs whitespace-nowrap"
         title="Claude analysis"
       >Analyze</button>
       <button
         id="settings-btn"
-        class="ml-2 px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-slate-300"
+        class="px-1.5 py-0.5 rounded border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs"
         title="Settings"
       >⚙</button>
     </div>
@@ -41,12 +41,18 @@
   <!-- Main 3-col layout -->
   <div class="flex-1 flex overflow-hidden">
     <!-- Watchlist + Setups -->
-    <aside class="w-56 border-r border-slate-800 overflow-y-auto flex flex-col">
-      <div class="px-3 py-2 text-xs uppercase text-slate-500 border-b border-slate-800">Watchlist</div>
-      <ul id="watchlist">
+    <aside id="left-sidebar" class="border-r border-slate-800 overflow-y-auto flex flex-col relative shrink-0" style="width: 280px; min-width: 180px; max-width: 40vw;">
+      <div class="px-2 py-1.5 border-b border-slate-800 flex items-center gap-1 shrink-0">
+        <span class="text-xs uppercase text-slate-500">Watchlist</span>
+        <form id="watchlist-add-form" class="flex-1 flex gap-1" autocomplete="off">
+          <input id="watchlist-add-input" type="text" placeholder="+ ticker"
+            class="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-xs uppercase" />
+        </form>
+      </div>
+      <ul id="watchlist" class="shrink-0 max-h-[25vh] overflow-y-auto">
         {% for ticker in watchlist %}
           <li
-            class="watch-item px-3 py-2 cursor-pointer hover:bg-slate-800 border-b border-slate-800/50 flex justify-between items-center {% if ticker == default_ticker %}bg-slate-800{% endif %}"
+            class="watch-item px-2 py-1 cursor-pointer hover:bg-slate-800 border-b border-slate-800/50 flex justify-between items-center text-sm {% if ticker == default_ticker %}bg-slate-800{% endif %}"
             data-ticker="{{ ticker }}"
           >
             <span class="font-bold">{{ ticker }}</span>
@@ -55,58 +61,63 @@
         {% endfor %}
       </ul>
 
-      <div class="border-t border-slate-800 mt-2">
-        <div class="px-3 py-2 flex items-center justify-between">
+      <div class="border-t border-slate-800 flex-1 flex flex-col min-h-0">
+        <div class="px-2 py-1 flex items-center justify-between shrink-0">
           <span class="text-xs uppercase text-slate-500">Setups</span>
           <div class="flex gap-2">
-            <button id="setups-rate" class="text-xs text-amber-400 hover:underline" title="Send top setups to Claude for a 1-10 rating">rate</button>
+            <button id="setups-rate" class="text-xs text-amber-400 hover:underline" title="Send all setups to Claude for a 1-10 rating">rate</button>
             <button id="setups-refresh" class="text-xs text-cyan-400 hover:underline">scan</button>
           </div>
         </div>
-        <ul id="setups-list" class="text-xs"></ul>
+        <ul id="setups-list" class="text-xs flex-1 overflow-y-auto min-h-0"></ul>
       </div>
 
-      <div class="border-t border-slate-800 mt-2">
-        <div class="px-3 py-2 flex items-center justify-between">
+      <div class="border-t border-slate-800 flex-1 flex flex-col min-h-0">
+        <div class="px-2 py-1 flex items-center justify-between shrink-0 flex-wrap gap-y-0.5">
           <span class="text-xs uppercase text-slate-500" title="Reddit (WSB / r/stocks / r/pennystocks / r/daytrading) + StockTwits trending">Trending</span>
-          <div class="flex items-center gap-2">
-            <label class="text-[10px] text-slate-500 flex items-center gap-1 cursor-pointer" title="Include sub-$5 names">
+          <div class="flex items-center gap-1.5">
+            <label class="text-[10px] text-slate-500 flex items-center gap-0.5 cursor-pointer" title="Include stocks $5+">
+              <input id="trending-standard-toggle" type="checkbox" checked class="accent-cyan-500" />
+              std
+            </label>
+            <label class="text-[10px] text-slate-500 flex items-center gap-0.5 cursor-pointer" title="Include sub-$5 names">
               <input id="trending-pennies-toggle" type="checkbox" checked class="accent-cyan-500" />
-              pennies
+              penny
             </label>
             <button id="trending-refresh" class="text-xs text-cyan-400 hover:underline" title="Fetch trending tickers from Reddit + StockTwits">scan</button>
           </div>
         </div>
-        <ul id="trending-list" class="text-xs">
-          <li class="px-3 py-1 text-slate-500">click scan</li>
+        <ul id="trending-list" class="text-xs flex-1 overflow-y-auto min-h-0">
+          <li class="px-2 py-1 text-slate-500">click scan</li>
         </ul>
       </div>
+      <div id="sidebar-resize-handle" style="position:absolute;top:0;right:0;width:5px;height:100%;cursor:col-resize;z-index:10;" class="hover:bg-cyan-500/30"></div>
     </aside>
 
     <!-- Chart -->
-    <main class="flex-1 flex flex-col">
-      <div id="chart" class="flex-1"></div>
-      <div id="rsi-chart" class="h-32 border-t border-slate-800"></div>
+    <main class="flex-1 flex flex-col min-w-0">
+      <div id="chart" class="flex-1 min-h-0"></div>
+      <div id="rsi-chart" style="height: clamp(60px, 15vh, 128px);" class="border-t border-slate-800 shrink-0"></div>
     </main>
 
     <!-- Right rail -->
-    <aside class="w-72 border-l border-slate-800 flex flex-col overflow-hidden">
-      <div class="px-3 py-2 border-b border-slate-800">
-        <div class="text-xs uppercase text-slate-500 mb-1 flex justify-between">
+    <aside class="border-l border-slate-800 flex flex-col overflow-hidden shrink-0" style="width: clamp(200px, 20vw, 288px);">
+      <div class="px-2 py-1.5 border-b border-slate-800 shrink-0">
+        <div class="text-xs uppercase text-slate-500 mb-0.5 flex justify-between">
           <span>Account</span>
           <span id="account-status" class="text-amber-400">—</span>
         </div>
-        <div class="text-sm space-y-0.5">
+        <div class="text-xs space-y-0">
           <div class="flex justify-between">
             <span class="text-slate-400">Equity</span>
             <span id="account-equity">—</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-slate-400">Settled cash</span>
+            <span class="text-slate-400">Cash</span>
             <span id="settled-cash">—</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-slate-400">Buying power</span>
+            <span class="text-slate-400">BP</span>
             <span id="buying-power">—</span>
           </div>
           <div class="flex justify-between">
@@ -116,18 +127,18 @@
         </div>
       </div>
 
-      <div class="px-3 py-2 border-b border-slate-800">
-        <div class="text-xs uppercase text-slate-500 mb-1">Positions</div>
-        <ul id="positions-list" class="text-xs space-y-1"><li class="text-slate-500">—</li></ul>
+      <div class="px-2 py-1.5 border-b border-slate-800 shrink-0 max-h-[30vh] overflow-y-auto">
+        <div class="text-xs uppercase text-slate-500 mb-0.5">Positions</div>
+        <ul id="positions-list" class="text-xs space-y-0.5"><li class="text-slate-500">—</li></ul>
       </div>
 
-      <div class="px-3 py-2 border-b border-slate-800 flex-1 overflow-y-auto">
-        <div class="text-xs uppercase text-slate-500 mb-1">Alerts</div>
-        <ul id="alerts-feed" class="text-xs space-y-1"></ul>
+      <div class="px-2 py-1.5 border-b border-slate-800 flex-1 min-h-0 overflow-y-auto">
+        <div class="text-xs uppercase text-slate-500 mb-0.5">Alerts</div>
+        <ul id="alerts-feed" class="text-xs space-y-0.5"></ul>
       </div>
 
-      <div class="px-3 py-2 border-t border-slate-800">
-        <button id="order-btn" class="w-full bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded text-sm font-bold">
+      <div class="px-2 py-1.5 border-t border-slate-800 shrink-0">
+        <button id="order-btn" class="w-full bg-cyan-700 hover:bg-cyan-600 px-2 py-1.5 rounded text-xs font-bold">
           Place order
         </button>
       </div>
@@ -426,5 +437,51 @@
   initAnalyze();
   initSetups();
   initTrending();
+
+  // Quick-add ticker to watchlist
+  document.getElementById("watchlist-add-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("watchlist-add-input");
+    const ticker = input.value.trim().toUpperCase();
+    if (!ticker) return;
+    input.disabled = true;
+    try {
+      const res = await fetch("/api/settings/watchlist/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticker }),
+      });
+      if (res.ok) {
+        input.value = "";
+        window.location.reload();
+      }
+    } finally {
+      input.disabled = false;
+    }
+  });
+
+  // Sidebar resize handle
+  (function() {
+    const sidebar = document.getElementById("left-sidebar");
+    const handle = document.getElementById("sidebar-resize-handle");
+    let dragging = false;
+    handle.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      dragging = true;
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    });
+    document.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      const w = Math.min(Math.max(e.clientX, 200), window.innerWidth * 0.5);
+      sidebar.style.width = w + "px";
+    });
+    document.addEventListener("mouseup", () => {
+      if (!dragging) return;
+      dragging = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    });
+  })();
 </script>
 {% endblock %}

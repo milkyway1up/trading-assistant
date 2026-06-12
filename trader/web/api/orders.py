@@ -6,6 +6,7 @@ side effects, then /submit to actually place.
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException
@@ -29,12 +30,18 @@ class OrderRequest(BaseModel):
 @router.post("/orders/preview")
 async def preview_order(req: OrderRequest) -> dict:
     """Compute sizing + run risk-guard checks. No order is placed."""
-    return _build_preview(req)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _build_preview, req)
 
 
 @router.post("/orders/submit")
 async def submit_order(req: OrderRequest) -> dict:
     """Submit the order after a fresh preview. Refuses if risk-guard blocks."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _submit_sync, req)
+
+
+def _submit_sync(req: OrderRequest) -> dict:
     preview = _build_preview(req)
     if not preview["ok"]:
         raise HTTPException(status_code=400, detail=preview)
@@ -51,7 +58,6 @@ async def submit_order(req: OrderRequest) -> dict:
         logger.exception("place_order failed")
         raise HTTPException(status_code=502, detail=f"Broker rejected order: {e}")
 
-    # Journal it.
     trade_id = None
     try:
         from trader.journal.entry import add_trade
@@ -77,6 +83,11 @@ async def submit_order(req: OrderRequest) -> dict:
 
 @router.get("/orders/open")
 async def open_orders() -> dict:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _open_orders_sync)
+
+
+def _open_orders_sync() -> dict:
     try:
         from trader.broker.factory import get_broker
         return {"orders": get_broker().get_open_orders()}
@@ -86,9 +97,10 @@ async def open_orders() -> dict:
 
 @router.post("/orders/{order_id}/cancel")
 async def cancel_order(order_id: str) -> dict:
+    from trader.broker.factory import get_broker
+    loop = asyncio.get_running_loop()
     try:
-        from trader.broker.factory import get_broker
-        return get_broker().cancel_order(order_id)
+        return await loop.run_in_executor(None, lambda: get_broker().cancel_order(order_id))
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 

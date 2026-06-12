@@ -175,7 +175,8 @@ async function refreshTrending() {
   list.innerHTML = `<li class="px-3 py-1 text-slate-500">scanning…</li>`;
   try {
     const includePennies = document.getElementById("trending-pennies-toggle")?.checked ?? true;
-    const res = await fetch(`/api/trending?limit=20&include_pennies=${includePennies}`);
+    const includeStandard = document.getElementById("trending-standard-toggle")?.checked ?? true;
+    const res = await fetch(`/api/trending?limit=20&include_pennies=${includePennies}&include_standard=${includeStandard}`);
     const data = await res.json();
     if (data.error) {
       list.innerHTML = `<li class="px-3 py-1 text-red-400">${tEscape(data.error)}</li>`;
@@ -193,6 +194,8 @@ window.initTrending = function () {
   if (refreshBtn) refreshBtn.addEventListener("click", refreshTrending);
   const pennyToggle = document.getElementById("trending-pennies-toggle");
   if (pennyToggle) pennyToggle.addEventListener("change", refreshTrending);
+  const standardToggle = document.getElementById("trending-standard-toggle");
+  if (standardToggle) standardToggle.addEventListener("change", refreshTrending);
   // Don't auto-fetch on dashboard load — these endpoints are external (rate limits).
   // User clicks "scan" to populate.
 };

@@ -8,7 +8,7 @@ import yfinance as yf
 from loguru import logger
 
 from trader.llm.client import call_claude
-from trader.llm.prompts import ANALYST_SYSTEM, MOMENTUM_RATER_SYSTEM, SETUP_RATER_SYSTEM
+from trader.llm.prompts import ANALYST_SYSTEM, BATCH_RATER_SYSTEM, MOMENTUM_RATER_SYSTEM, SETUP_RATER_SYSTEM
 
 
 def _fetch_context(ticker: str) -> dict[str, Any]:
@@ -169,6 +169,112 @@ def rate_setup(ticker: str, setup: dict[str, Any]) -> dict[str, Any]:
     except (TypeError, ValueError):
         rating = None
     return {"rating": rating, "reason": result.get("reason", "")}
+
+
+def _fetch_context_minimal(ticker: str) -> dict[str, Any]:
+    """Ultra-compact context for batch rating: last 5 bars + summary stats."""
+    yf_ticker = yf.Ticker(ticker)
+
+    daily = yf_ticker.history(period="3mo", interval="1d", auto_adjust=False)
+    if daily.empty or len(daily) < 5:
+        return {"ticker": ticker, "bars": [], "news": []}
+
+    last_30 = daily.tail(30)
+    last_5 = daily.tail(5)
+
+    bars = []
+    for idx, row in last_5.iterrows():
+        bars.append({
+            "d": idx.strftime("%m-%d"),
+            "c": round(float(row["Close"]), 2),
+            "v": round(float(row["Volume"]) / 1e6, 1),
+        })
+
+    avg_vol_20 = float(last_30["Volume"].mean()) if len(last_30) >= 20 else float(last_5["Volume"].mean())
+    high_30 = float(last_30["High"].max())
+    low_30 = float(last_30["Low"].min())
+    close_30_ago = float(last_30.iloc[0]["Close"]) if len(last_30) >= 20 else float(last_5.iloc[0]["Close"])
+    close_now = float(last_5.iloc[-1]["Close"])
+    pct_30d = round((close_now - close_30_ago) / close_30_ago * 100, 1)
+
+    news = []
+    try:
+        for n in (yf_ticker.news or [])[:3]:
+            content = n.get("content") or n
+            title = content.get("title") or content.get("headline", "")
+            if title:
+                news.append(title[:80])
+    except Exception:
+        pass
+
+    return {
+        "ticker": ticker,
+        "price": close_now,
+        "chg_30d": f"{pct_30d}%",
+        "hi_30": high_30,
+        "lo_30": low_30,
+        "avg_vol_m": round(avg_vol_20 / 1e6, 1),
+        "bars_5d": bars,
+        "news": news,
+    }
+
+
+def rate_setups_batch(setups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rate all setups in a single Claude call. Much faster than per-setup calls.
+
+    Uses minimal context (5 bars + stats per ticker) to keep the prompt small.
+    Fetches data in parallel threads, then one Claude call for all ratings.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    if not setups:
+        return []
+
+    def _fetch_one(s: dict) -> dict[str, Any]:
+        ticker = (s.get("ticker") or "").upper()
+        ctx = _fetch_context_minimal(ticker)
+        ctx["setup"] = {
+            k: s.get(k) for k in ("setup", "entry", "stop", "target", "risk_reward",
+                                    "confidence", "reason", "side")
+            if s.get(k) is not None
+        }
+        return ctx
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        contexts = list(pool.map(_fetch_one, setups))
+
+    user_msg = (
+        f"Rate all {len(contexts)} setups. Return a JSON array, one object per setup, same order.\n\n"
+        f"```json\n{_compact_json(contexts)}\n```"
+    )
+
+    result = call_claude(
+        system=BATCH_RATER_SYSTEM,
+        user=user_msg,
+        cache_system=True,
+        json_response=True,
+        max_tokens=100 * len(setups),
+    )
+
+    if isinstance(result, list):
+        ratings = []
+        for i, r in enumerate(result):
+            if not isinstance(r, dict):
+                r = {}
+            rating = r.get("rating")
+            try:
+                rating = int(rating) if rating is not None else None
+            except (TypeError, ValueError):
+                rating = None
+            ratings.append({
+                "ticker": r.get("ticker") or (setups[i].get("ticker") if i < len(setups) else "?"),
+                "rating": rating,
+                "reason": r.get("reason", ""),
+            })
+        return ratings
+
+    logger.warning("Batch rater returned non-list: {}", type(result))
+    return [{"ticker": s.get("ticker", "?"), "rating": None, "reason": "batch parse failed"} for s in setups]
 
 
 def rate_momentum(ticker: str, social: dict[str, Any]) -> dict[str, Any]:

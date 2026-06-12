@@ -6,6 +6,8 @@ the UI degrades gracefully instead of 500ing.
 """
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter
 from loguru import logger
 
@@ -15,6 +17,11 @@ router = APIRouter(tags=["account"])
 @router.get("/account")
 async def get_account() -> dict:
     """Live account snapshot + open positions from the configured broker."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _get_account_sync)
+
+
+def _get_account_sync() -> dict:
     try:
         from trader.broker.factory import get_broker
         broker = get_broker()

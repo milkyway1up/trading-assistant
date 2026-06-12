@@ -1,6 +1,7 @@
 """Backtest endpoints."""
 from __future__ import annotations
 
+import asyncio
 import importlib
 import pkgutil
 from typing import Optional
@@ -33,6 +34,11 @@ class BacktestRequest(BaseModel):
 
 @router.post("/backtest/run")
 async def run(req: BacktestRequest) -> dict:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _run_sync, req)
+
+
+def _run_sync(req: BacktestRequest) -> dict:
     from trader.backtest.engine import run_backtest
     from trader.data.yfinance_bars import get_bars
 

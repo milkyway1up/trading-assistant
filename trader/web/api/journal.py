@@ -1,6 +1,7 @@
 """Journal endpoints: list trades, stats, sync, annotate, grade."""
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException
@@ -16,6 +17,13 @@ async def list_trades(
     limit: int = 200,
     closed_only: bool = False,
 ) -> dict:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None, lambda: _list_trades_sync(setup, limit, closed_only)
+    )
+
+
+def _list_trades_sync(setup, limit, closed_only) -> dict:
     from trader.journal.db import Trade, get_session
 
     session = get_session()
@@ -31,7 +39,9 @@ async def list_trades(
 @router.get("/journal/stats")
 async def journal_stats(since_days: Optional[int] = 30) -> dict:
     from trader.journal.analytics import stats
-    return stats(since_days=since_days)
+
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: stats(since_days=since_days))
 
 
 class SyncRequest(BaseModel):
@@ -41,9 +51,13 @@ class SyncRequest(BaseModel):
 @router.post("/journal/sync")
 async def journal_sync(body: SyncRequest = SyncRequest()) -> dict:
     """Pull recent broker fills into the journal."""
+    from trader.journal.sync import sync_fills
+
+    loop = asyncio.get_running_loop()
     try:
-        from trader.journal.sync import sync_fills
-        return sync_fills(since_days=body.since_days)
+        return await loop.run_in_executor(
+            None, lambda: sync_fills(since_days=body.since_days)
+        )
     except Exception as e:
         logger.exception("journal sync failed")
         raise HTTPException(status_code=502, detail=str(e))
@@ -75,8 +89,11 @@ async def annotate_trade(trade_id: int, body: AnnotateRequest) -> dict:
 @router.post("/journal/{trade_id}/grade")
 async def grade_endpoint(trade_id: int) -> dict:
     """Have Claude grade a closed trade against its entry thesis."""
-    from datetime import timedelta
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _grade_sync(trade_id))
 
+
+def _grade_sync(trade_id: int) -> dict:
     from trader.journal.db import Trade, get_session
     from trader.llm.grade import grade_trade
 

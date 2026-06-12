@@ -55,7 +55,7 @@ def _http_get_json(url: str, timeout: float = 8.0) -> dict[str, Any] | None:
         return None
 
 
-def _fetch_apewisdom(filter_name: str, limit: int = 50) -> list[dict[str, Any]]:
+def _fetch_apewisdom(filter_name: str, limit: int = 100) -> list[dict[str, Any]]:
     data = _http_get_json(APEWISDOM_URL.format(filter=filter_name))
     if not data:
         return []
@@ -128,6 +128,7 @@ def _enrich_prices(tickers: Iterable[str]) -> dict[str, float | None]:
 def fetch_trending(
     limit: int = 25,
     include_pennies: bool = True,
+    include_standard: bool = True,
     min_mentions: int = 3,
 ) -> list[dict[str, Any]]:
     """Merge social-momentum sources into a single ranked ticker list.
@@ -185,7 +186,11 @@ def fetch_trending(
         key=lambda r: (r["mentions"], 1 if r.get("stocktwits_trending") else 0),
         reverse=True,
     )
-    rows = rows[: max(limit * 2, limit + 5)]  # over-fetch so the price filter has room
+    # When filtering to one category, over-fetch aggressively so we have enough
+    # candidates after the price filter removes the other category.
+    filtering_one = (not include_pennies) != (not include_standard)
+    pool_size = limit * 5 if filtering_one else max(limit * 2, limit + 5)
+    rows = rows[:pool_size]
 
     prices = _enrich_prices(r["ticker"] for r in rows)
     out: list[dict[str, Any]] = []
@@ -194,6 +199,8 @@ def fetch_trending(
         r["last_price"] = price
         r["is_penny"] = (price is not None and price < 5.0)
         if not include_pennies and r["is_penny"]:
+            continue
+        if not include_standard and not r["is_penny"]:
             continue
         out.append(r)
         if len(out) >= limit:

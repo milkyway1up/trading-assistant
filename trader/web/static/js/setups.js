@@ -96,9 +96,8 @@ async function rateTopSetups() {
   btn.textContent = "rating…";
   btn.disabled = true;
 
-  // Show a placeholder badge on the top 4 rows
-  document.querySelectorAll("#setups-list [data-setup-idx]").forEach((li, i) => {
-    if (i >= 4) return;
+  // Show a placeholder badge on all rows
+  document.querySelectorAll("#setups-list [data-setup-idx]").forEach((li) => {
     if (!li.querySelector(".claude-badge")) {
       const span = document.createElement("span");
       span.className = "claude-badge text-xs text-slate-500";
@@ -109,7 +108,8 @@ async function rateTopSetups() {
   });
 
   try {
-    const res = await fetch("/api/setups/rate?top=4", { method: "POST" });
+    const count = currentSetups.length || 20;
+    const res = await fetch(`/api/setups/rate?top=${count}`, { method: "POST" });
     const data = await res.json();
     if (data.error) {
       btn.title = data.error;
@@ -143,7 +143,7 @@ async function rateTopSetups() {
     setTimeout(() => {
       btn.textContent = originalLabel;
       btn.disabled = false;
-      btn.title = "Send top setups to Claude for a 1-10 rating";
+      btn.title = "Send all setups to Claude for a 1-10 rating";
     }, 1500);
   }
 }

@@ -1,6 +1,8 @@
 """Weekly prep document endpoints."""
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 
@@ -36,9 +38,11 @@ async def get_prep(name: str) -> dict:
 @router.post("/prep")
 async def generate_prep() -> dict:
     """Run the weekly prep generator. Blocks until Claude responds (~30s)."""
+    from trader.llm.prep import generate_weekly_prep
+
+    loop = asyncio.get_running_loop()
     try:
-        from trader.llm.prep import generate_weekly_prep
-        path = generate_weekly_prep()
+        path = await loop.run_in_executor(None, generate_weekly_prep)
         return {"name": path.name, "path": str(path)}
     except Exception as e:
         logger.exception("prep generation failed")

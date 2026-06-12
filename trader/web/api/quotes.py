@@ -1,6 +1,7 @@
 """Quote + bar endpoints. Falls back to yfinance when Schwab not configured."""
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import datetime, timedelta
 from typing import Literal
@@ -30,14 +31,15 @@ async def get_bars(ticker: str, timeframe: Timeframe = "1d") -> dict:
     → deterministic mock data, so the dashboard always has something to render.
     """
     ticker = ticker.upper()
+    loop = asyncio.get_running_loop()
 
     try:
-        return _broker_bars(ticker, timeframe)
+        return await loop.run_in_executor(None, _broker_bars, ticker, timeframe)
     except Exception as e:
         broker_err = str(e)
 
     try:
-        return _yfinance_bars(ticker, timeframe)
+        return await loop.run_in_executor(None, _yfinance_bars, ticker, timeframe)
     except Exception as e:
         return {
             "ticker": ticker,
@@ -52,6 +54,11 @@ async def get_bars(ticker: str, timeframe: Timeframe = "1d") -> dict:
 async def get_quote(ticker: str) -> dict:
     """Latest quote (last price + day change). Tries broker → yfinance → mock."""
     ticker = ticker.upper()
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _get_quote_sync, ticker)
+
+
+def _get_quote_sync(ticker: str) -> dict:
     try:
         from trader.broker.factory import get_data_client
         return get_data_client().get_quote(ticker)
